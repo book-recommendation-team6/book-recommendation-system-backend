@@ -30,6 +30,6 @@ public class Genre {
     @Column(name = "description")
     private String description;
 
-    @OneToMany(mappedBy = "genre", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<BookGenre> bookGenres = new HashSet<>();
+    @ManyToMany(mappedBy = "genres")
+    private Set<Book> books = new HashSet<>();
 }
