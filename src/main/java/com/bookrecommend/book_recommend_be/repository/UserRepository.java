@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-    User findByUsername(String username);
-
     boolean existsByEmail(@NotBlank(message = "Email must not be blank") @Email(message = "Invalid email format") String email);
+
+    User findByEmail(String email);
 }
