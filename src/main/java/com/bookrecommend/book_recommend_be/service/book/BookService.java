@@ -22,7 +22,6 @@ import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class BookService implements IBookService {
 
     private final BookRepository bookRepository;
