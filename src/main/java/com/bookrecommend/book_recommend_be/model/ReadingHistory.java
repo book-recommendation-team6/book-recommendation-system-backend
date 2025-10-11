@@ -12,7 +12,9 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "reading_history", uniqueConstraints = {@UniqueConstraint(name = "uk_history_user_book", columnNames = {"user_id", "book_id"})})
+@Table(name = "reading_history",
+        schema = "book_recommendation_system",
+        uniqueConstraints = {@UniqueConstraint(name = "uk_history_user_book", columnNames = {"user_id", "book_id"})})
 public class ReadingHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

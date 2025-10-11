@@ -12,7 +12,9 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "favorites", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
+@Table(name = "favorites",
+        schema = "book_recommendation_system",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
 public class Favorite {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

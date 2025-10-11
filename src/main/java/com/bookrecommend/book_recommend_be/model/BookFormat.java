@@ -11,7 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "book_formats")
+@Table(name = "book_formats", schema = "book_recommendation_system")
 public class BookFormat {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

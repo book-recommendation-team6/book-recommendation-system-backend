@@ -26,6 +26,40 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Books retrieved successfully"));
     }
 
+    @GetMapping("/newest")
+    public ResponseEntity<ApiResponse<Page<BookResponse>>> getNewestBooks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<BookResponse> books = bookService.getNewestBooks(page, size);
+        return ResponseEntity.ok(ApiResponse.success(books, "Newest books retrieved successfully"));
+    }
+
+    @GetMapping("/most-read")
+    public ResponseEntity<ApiResponse<Page<BookResponse>>> getMostReadBooks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<BookResponse> books = bookService.getMostReadBooks(page, size);
+        return ResponseEntity.ok(ApiResponse.success(books, "Most read books retrieved successfully"));
+    }
+
+    @GetMapping("/genre/{genreId}")
+    public ResponseEntity<ApiResponse<Page<BookResponse>>> getBooksByGenre(
+            @PathVariable Long genreId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<BookResponse> books = bookService.getBooksByGenre(genreId, page, size);
+        return ResponseEntity.ok(ApiResponse.success(books, "Books by genre retrieved successfully"));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<BookResponse>>> searchBooks(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<BookResponse> books = bookService.searchBooks(keyword, page, size);
+        return ResponseEntity.ok(ApiResponse.success(books, "Books found successfully"));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<BookResponse>> getBookById(@PathVariable Long id) {
         BookResponse book = bookService.getBookById(id);

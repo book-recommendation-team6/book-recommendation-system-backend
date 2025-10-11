@@ -11,7 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "roles")
+@Table(name = "roles", schema = "book_recommendation_system")
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

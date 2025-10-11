@@ -13,7 +13,9 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "bookmarks", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
+@Table(name = "bookmarks",
+        schema = "book_recommendation_system",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
 public class Bookmark {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

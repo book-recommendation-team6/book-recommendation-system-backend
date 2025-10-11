@@ -15,6 +15,16 @@ spring:
         default_schema: book_recommendation_system
         format_sql: true
     show-sql: true
+    open-in-view: false
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
+    com.zaxxer.hikari: INFO
+    org.hibernate.orm.connections.pooling: WARN
+    org.springframework.jdbc.datasource.DataSourceUtils: INFO
 
 api:
   prefix: /api/v1

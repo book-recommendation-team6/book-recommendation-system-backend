@@ -14,7 +14,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "authors")
+@Table(name = "authors", schema = "book_recommendation_system")
 public class Author {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,8 +26,7 @@ public class Author {
     @Column(name = "author_name", nullable = false, length = 100)
     private String name;
 
-    @Lob
-    @Column(name = "biography")
+    @Column(name = "biography", columnDefinition = "TEXT")
     private String biography;
 
     @ManyToMany(mappedBy = "authors")

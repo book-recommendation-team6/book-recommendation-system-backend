@@ -39,6 +39,27 @@ public class BookService implements IBookService {
     }
 
     @Override
+    public Page<BookResponse> getNewestBooks(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return bookRepository.findNewestBooks(pageable)
+                .map(book -> modelMapper.map(book, BookResponse.class));
+    }
+
+    @Override
+    public Page<BookResponse> getMostReadBooks(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return bookRepository.findMostReadBooks(pageable)
+                .map(book -> modelMapper.map(book, BookResponse.class));
+    }
+
+    @Override
+    public Page<BookResponse> getBooksByGenre(Long genreId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return bookRepository.findBooksByGenre(genreId, pageable)
+                .map(book -> modelMapper.map(book, BookResponse.class));
+    }
+
+    @Override
     public BookResponse getBookById(Long id) {
         Book book = findBookOrThrow(id);
         return modelMapper.map(book, BookResponse.class);
@@ -100,7 +121,49 @@ public class BookService implements IBookService {
     @Transactional
     public BookResponse updateBook(Long id, BookRequest request) {
         Book book = findBookOrThrow(id);
-        modelMapper.map(request, book);
+
+        modelMapper.typeMap(BookRequest.class, Book.class)
+                .addMappings(mapper -> {
+                    mapper.skip(Book::setAuthors);
+                    mapper.skip(Book::setGenres);
+                    mapper.skip(Book::setFormats);
+                })
+                .map(request, book);
+
+        Set<Author> finalAuthors = new HashSet<>();
+        for (String authorName : request.getAuthorNames()) {
+            Author author = authorRepository.findByNameIgnoreCase(authorName)
+                    .orElseGet(() -> {
+                        Author newAuthor = new Author();
+                        newAuthor.setName(authorName);
+                        return authorRepository.save(newAuthor);
+                    });
+            finalAuthors.add(author);
+        }
+        book.setAuthors(finalAuthors);
+
+        List<Genre> genres = genreRepository.findAllById(request.getGenreIds());
+        if (genres.size() != request.getGenreIds().size()) {
+            throw new ResourceNotFoundException("One or more genres not found");
+        }
+        book.setGenres(new HashSet<>(genres));
+
+        book.getFormats().clear();
+        List<BookFormat> formats = request.getFormats().stream()
+                .map(f -> {
+                    BookType type = bookTypeRepository.findById(f.getTypeId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Format type not found"));
+                    BookFormat format = new BookFormat();
+                    format.setBook(book);
+                    format.setType(type);
+                    format.setContentUrl(f.getContentUrl());
+                    format.setTotalPages(f.getTotalPages());
+                    format.setFileSizeKb(f.getFileSizeKb());
+                    return format;
+                })
+                .toList();
+        book.getFormats().addAll(formats);
+
         Book updatedBook = bookRepository.save(book);
         return modelMapper.map(updatedBook, BookResponse.class);
     }
@@ -110,6 +173,13 @@ public class BookService implements IBookService {
     public void deleteBook(Long id) {
         Book book = findBookOrThrow(id);
         bookRepository.delete(book);
+    }
+
+    @Override
+    public Page<BookResponse> searchBooks(String keyword, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return bookRepository.searchBooks(keyword, pageable)
+                .map(book -> modelMapper.map(book, BookResponse.class));
     }
 
     private Book findBookOrThrow(Long id) {

@@ -7,6 +7,12 @@ import org.springframework.data.domain.Page;
 public interface IBookService {
     Page<BookResponse> getBooks(int page, int size);
 
+    Page<BookResponse> getNewestBooks(int page, int size);
+
+    Page<BookResponse> getMostReadBooks(int page, int size);
+
+    Page<BookResponse> getBooksByGenre(Long genreId, int page, int size);
+
     BookResponse getBookById(Long id);
 
     BookResponse createBook(BookRequest request);
@@ -14,4 +20,7 @@ public interface IBookService {
     BookResponse updateBook(Long id, BookRequest request);
 
     void deleteBook(Long id);
+
+    Page<BookResponse> searchBooks(String keyword, int page, int size);
+
 }

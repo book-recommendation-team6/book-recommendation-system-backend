@@ -1,12 +1,14 @@
 package com.bookrecommend.book_recommend_be.dto.response;
 
-import lombok.Builder;
-import lombok.Value;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-@Value
-@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
 public class BookResponse {
     Long id;
     String title;

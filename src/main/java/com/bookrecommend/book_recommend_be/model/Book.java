@@ -19,7 +19,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "books")
+@Table(name = "books", schema = "book_recommendation_system")
 public class Book {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,8 +32,7 @@ public class Book {
     private String title;
 
     @NotBlank
-    @Lob
-    @Column(name = "description", nullable = false)
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
     @NotBlank

@@ -16,7 +16,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "book_recommendation_system")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

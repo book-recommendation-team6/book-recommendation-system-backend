@@ -14,7 +14,9 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "ratings", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
+@Table(name = "ratings",
+        schema = "book_recommendation_system",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
 public class Rating {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,8 +36,7 @@ public class Rating {
     @Column(name = "rating_value", nullable = false)
     private Integer value;
 
-    @Lob
-    @Column(name = "comment")
+    @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
     @CreationTimestamp

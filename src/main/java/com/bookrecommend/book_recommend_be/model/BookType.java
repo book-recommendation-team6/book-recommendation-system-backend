@@ -14,7 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "book_types")
+@Table(name = "book_types", schema = "book_recommendation_system")
 public class BookType {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
