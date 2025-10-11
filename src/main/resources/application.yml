@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: "Book Recommendation System"
   datasource:
@@ -17,6 +20,40 @@ spring:
     show-sql: true
     open-in-view: false
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: profile, email
+            redirect-uri: "{baseUrl}/oauth2/callback/google"
+          facebook:
+            client-id: ${FACEBOOK_CLIENT_ID}
+            client-secret: ${FACEBOOK_CLIENT_SECRET}
+            scope: public_profile, email
+            redirect-uri: "{baseUrl}/oauth2/callback/facebook"
+        provider:
+          facebook:
+            authorization-uri: https://www.facebook.com/v20.0/dialog/oauth
+            token-uri: https://graph.facebook.com/v20.0/oauth/access_token
+            user-info-uri: https://graph.facebook.com/me?fields=id,name,email,picture
+            user-name-attribute: id
+
+api:
+  prefix: /api/v1
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+auth:
+  token:
+    jwtSecret: ${JWT_SECRET}
+    accessExpirationInMils: ${ACCESS_EXPIRATION_IN_MILS} # 2h
+app:
+  oauth2:
+    redirectUri: ${OAUTH2_REDIRECT_URI}
+    failureRedirectUri: ${OAUTH2_REDIRECT_URI}
+
 logging:
   level:
     org.hibernate.SQL: DEBUG
@@ -25,12 +62,3 @@ logging:
     com.zaxxer.hikari: INFO
     org.hibernate.orm.connections.pooling: WARN
     org.springframework.jdbc.datasource.DataSourceUtils: INFO
-
-api:
-  prefix: /api/v1
-cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
-auth:
-  token:
-    jwtSecret: ${JWT_SECRET:fwaqefhwaeufhasufhaowufhaweiofhwoe1234124awefawwerwaer21324}
-    accessExpirationInMils: 7200000
