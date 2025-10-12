@@ -26,9 +26,9 @@ public class AppUserDetailsService implements UserDetailsService {
             throw new DisabledException("user is banned");
         }
 
-//        if (!user.isActivate()) {
-//            throw new DisabledException("user is not activated");
-//        }
+        if (!user.isActivate()) {
+            throw new DisabledException("user is not activated");
+        }
 
         return AppUserDetails.buildUserDetails(user);
     }

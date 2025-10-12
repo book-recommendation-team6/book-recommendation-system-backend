@@ -37,7 +37,7 @@ public class AppUserDetails implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPassword(),
-                true,
+                user.isActivate(),
                 authorities
         );
     }

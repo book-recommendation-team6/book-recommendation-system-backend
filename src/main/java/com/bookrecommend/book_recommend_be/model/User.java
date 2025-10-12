@@ -54,6 +54,18 @@ public class User {
     @Column(name = "is_activate", nullable = false)
     private boolean activate = false;
 
+    @Column(name = "email_verification_token", length = 255)
+    private String emailVerificationToken;
+
+    @Column(name = "email_verification_token_expiry")
+    private Instant emailVerificationTokenExpiry;
+
+    @Column(name = "reset_password_token", length = 255)
+    private String resetPasswordToken;
+
+    @Column(name = "reset_password_token_expiry")
+    private Instant resetPasswordTokenExpiry;
+
     @Size(max = 100)
     @Column(name = "full_name", length = 100)
     private String fullName;
