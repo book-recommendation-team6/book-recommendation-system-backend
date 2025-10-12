@@ -2,6 +2,8 @@ package com.bookrecommend.book_recommend_be.config;
 
 import com.bookrecommend.book_recommend_be.security.jwt.AuthTokenFilter;
 import com.bookrecommend.book_recommend_be.security.jwt.JwtEntryPoint;
+import com.bookrecommend.book_recommend_be.security.oauth2.OAuth2FailureHandler;
+import com.bookrecommend.book_recommend_be.security.oauth2.OAuth2SuccessHandler;
 import com.bookrecommend.book_recommend_be.security.userdetails.AppUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +16,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -25,7 +29,10 @@ public class SecurityConfig {
     private final AppUserDetailsService userDetailsService;
     private final JwtEntryPoint authEntryPoint;
     private final AuthTokenFilter authTokenFilter;
-    private final PasswordEncoder passwordEncoder;
+    private final OAuth2UserService<OAuth2UserRequest, OAuth2User> oAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
+
     @Value("${api.prefix}")
     private String API;
 
@@ -47,6 +54,11 @@ public class SecurityConfig {
 //                        .requestMatchers(API + "/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(API + "/auth/**").permitAll()
                         .anyRequest().permitAll())
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(oAuth2UserService))
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler(oAuth2FailureHandler))
                 .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
