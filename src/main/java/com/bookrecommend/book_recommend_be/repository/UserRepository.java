@@ -32,4 +32,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 ORDER BY CAST(u.createdAt AS date)
             """)
     List<Object[]> countNewUsersByDate(@Param("startDate") Instant startDate);
+
+    boolean existsByUsername(@NotBlank @Size(max = 50) String username);
+
+    boolean existsByPhoneNumber(@NotBlank @Size(max = 50) String username);
 }

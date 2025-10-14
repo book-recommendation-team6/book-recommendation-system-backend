@@ -70,6 +70,13 @@ public class AuthService implements IAuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (userRepository.existsByPhoneNumber(request.getUsername())) {
+            throw new RuntimeException("Phone number already exists");
+        }
+
         Role userRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
