@@ -88,10 +88,10 @@ public class AuthService implements IAuthService {
         userRepository.save(user);
 
         String verificationLink = buildUrl(verificationUrl, verificationToken);
-        emailService.sendEmail(
+        emailService.sendVerificationEmail(
                 user.getEmail(),
-                "Verify your email",
-                "Please verify your email by clicking the following link: " + verificationLink
+                user.getUsername(),
+                verificationLink
         );
     }
 
@@ -128,10 +128,10 @@ public class AuthService implements IAuthService {
         userRepository.save(user);
 
         String resetLink = buildUrl(resetPasswordUrl, user.getResetPasswordToken());
-        emailService.sendEmail(
+        emailService.sendResetPasswordEmail(
                 user.getEmail(),
-                "Reset your password",
-                "You can reset your password by clicking the following link: " + resetLink
+                user.getUsername(),
+                resetLink
         );
     }
 

@@ -16,7 +16,7 @@ public class UserController {
 
     private final IUserService userService;
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id}/update")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(@PathVariable Long id,
                                                                 @Valid @RequestBody UpdateUserRequest request) {
         UserResponse response = userService.updateUser(id, request);
