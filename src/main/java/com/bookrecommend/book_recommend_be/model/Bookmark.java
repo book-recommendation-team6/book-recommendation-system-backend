@@ -14,7 +14,6 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(name = "bookmarks",
-        schema = "book_recommendation_system",
         uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
 public class Bookmark {
     @Id
