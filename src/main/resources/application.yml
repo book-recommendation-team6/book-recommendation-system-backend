@@ -18,7 +18,7 @@ spring:
         default_schema: book_recommendation_system
         format_sql: true
     show-sql: true
-    open-in-view: false
+    open-in-view: true
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -40,12 +40,12 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: profile, email
-            redirect-uri: "{baseUrl}/oauth2/callback/google"
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
           facebook:
             client-id: ${FACEBOOK_CLIENT_ID}
             client-secret: ${FACEBOOK_CLIENT_SECRET}
             scope: public_profile, email
-            redirect-uri: "{baseUrl}/oauth2/callback/facebook"
+            redirect-uri: "{baseUrl}/login/oauth2/code/facebook"
         provider:
           facebook:
             authorization-uri: https://www.facebook.com/v20.0/dialog/oauth
@@ -64,16 +64,18 @@ auth:
 app:
   oauth2:
     redirectUri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/success}
-    failureRedirectUri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/error}
+    failureRedirectUri: ${OAUTH2_FAILURE_REDIRECT_URI:http://localhost:5173/oauth2/error}
   auth:
     verification-url: ${APP_AUTH_VERIFICATION_URL:http://localhost:8080/api/v1/auth/verify-email?token=}
     reset-password-url: ${APP_AUTH_RESET_PASSWORD_URL:http://localhost:5173/reset-password?token=}
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
-    com.zaxxer.hikari: INFO
-    org.hibernate.orm.connections.pooling: WARN
-    org.springframework.jdbc.datasource.DataSourceUtils: INFO
+    #    org.hibernate.SQL: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+#    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+#    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
+#    com.zaxxer.hikari: INFO
+#    org.hibernate.orm.connections.pooling: WARN
+#    org.springframework.jdbc.datasource.DataSourceUtils: INFO

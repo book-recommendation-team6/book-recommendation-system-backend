@@ -21,6 +21,11 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -42,18 +47,45 @@ public class SecurityConfig {
     }
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        String adminEndpoints = API + "/admin/**";
+        String authEndpoints = API + "/auth/**";
+        String bookEndpoints = API + "/books/**";
+        String userEndpoints = API + "/users/**";
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authEntryPoint))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS).permitAll()
-//                        .requestMatchers(API + "/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers(API + "/auth/**").permitAll()
-                        .anyRequest().permitAll())
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(authEndpoints).permitAll()
+                        .requestMatchers(HttpMethod.GET, bookEndpoints).permitAll()
+                        .requestMatchers(adminEndpoints).hasAuthority("Admin")
+                        .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("Admin")
+                        .requestMatchers(HttpMethod.PUT, bookEndpoints).hasAuthority("Admin")
+                        .requestMatchers(HttpMethod.DELETE, bookEndpoints).hasAuthority("Admin")
+                        .requestMatchers(HttpMethod.PATCH,
+                                API + "/users/*/ban",
+                                API + "/users/*/unban").hasAuthority("Admin")
+                        .requestMatchers(userEndpoints).authenticated()
+                        .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oAuth2UserService))

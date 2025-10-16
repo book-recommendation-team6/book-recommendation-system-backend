@@ -38,4 +38,29 @@ public interface BookRepository extends JpaRepository<Book, Long> {
             ORDER BY b.createdAt DESC
             """)
     Page<Book> searchBooks(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+            SELECT b.id AS bookId,
+                   b.title AS title,
+                   b.coverImageUrl AS coverImageUrl,
+                   COALESCE(AVG(r.value), 0) AS averageRating,
+                   COUNT(r) AS ratingCount
+            FROM Book b
+            LEFT JOIN b.ratings r
+            GROUP BY b.id, b.title, b.coverImageUrl
+            ORDER BY COALESCE(AVG(r.value), 0) DESC, COUNT(r) DESC
+            """)
+    Page<Object[]> findTopRatedBooks(Pageable pageable);
+
+    @Query("""
+            SELECT b.id AS bookId,
+                   b.title AS title,
+                   b.coverImageUrl AS coverImageUrl,
+                   COUNT(f) AS favoriteCount
+            FROM Book b
+            LEFT JOIN b.favorites f
+            GROUP BY b.id, b.title, b.coverImageUrl
+            ORDER BY COUNT(f) DESC, b.title ASC
+            """)
+    Page<Object[]> findTopFavoritedBooks(Pageable pageable);
 }

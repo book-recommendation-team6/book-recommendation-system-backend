@@ -1,5 +1,7 @@
 package com.bookrecommend.book_recommend_be.service.email;
 
 public interface IEmailService {
-    void sendEmail(String to, String subject, String content);
+    void sendVerificationEmail(String to, String username, String verificationLink);
+
+    void sendResetPasswordEmail(String to, String username, String resetLink);
 }

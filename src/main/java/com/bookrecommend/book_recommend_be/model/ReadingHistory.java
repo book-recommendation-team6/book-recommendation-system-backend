@@ -13,7 +13,6 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(name = "reading_history",
-        schema = "book_recommendation_system",
         uniqueConstraints = {@UniqueConstraint(name = "uk_history_user_book", columnNames = {"user_id", "book_id"})})
 public class ReadingHistory {
     @Id

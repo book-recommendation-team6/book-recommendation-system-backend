@@ -1,7 +1,6 @@
 package com.bookrecommend.book_recommend_be.security.oauth2;
 
 import com.bookrecommend.book_recommend_be.security.jwt.JwtUtils;
-import com.bookrecommend.book_recommend_be.security.userdetails.AppUserDetails;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,19 +33,19 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
 
-        if (!(authentication.getPrincipal() instanceof AppUserDetails userDetails)) {
+        if (!(authentication.getPrincipal() instanceof CustomOAuth2User customUser)) {
             log.error("Principal type invalid: {}", authentication.getPrincipal().getClass().getName());
             sendErrorRedirect(response, "invalid_principal_type");
             return;
         }
 
-        String email = userDetails.getEmail();
+        String email = customUser.getEmail();
         if (email == null || email.isEmpty()) {
             sendErrorRedirect(response, "email_not_found");
             return;
         }
 
-        String accessToken = jwtUtils.generateAccessToken(authentication);
+        String accessToken = jwtUtils.generateToken(email, customUser.getUser().getId(), customUser.getUser().getRole().getName());
         String redirectUrl = UriComponentsBuilder.fromUriString(defaultRedirectUri)
                 .queryParam("token", accessToken)
                 .build().toUriString();

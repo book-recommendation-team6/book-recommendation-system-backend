@@ -70,6 +70,13 @@ public class AuthService implements IAuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (userRepository.existsByPhoneNumber(request.getUsername())) {
+            throw new RuntimeException("Phone number already exists");
+        }
+
         Role userRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
@@ -88,10 +95,10 @@ public class AuthService implements IAuthService {
         userRepository.save(user);
 
         String verificationLink = buildUrl(verificationUrl, verificationToken);
-        emailService.sendEmail(
+        emailService.sendVerificationEmail(
                 user.getEmail(),
-                "Verify your email",
-                "Please verify your email by clicking the following link: " + verificationLink
+                user.getUsername(),
+                verificationLink
         );
     }
 
@@ -128,10 +135,10 @@ public class AuthService implements IAuthService {
         userRepository.save(user);
 
         String resetLink = buildUrl(resetPasswordUrl, user.getResetPasswordToken());
-        emailService.sendEmail(
+        emailService.sendResetPasswordEmail(
                 user.getEmail(),
-                "Reset your password",
-                "You can reset your password by clicking the following link: " + resetLink
+                user.getUsername(),
+                resetLink
         );
     }
 
