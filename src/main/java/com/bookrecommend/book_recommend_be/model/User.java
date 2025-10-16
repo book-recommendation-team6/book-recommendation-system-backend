@@ -23,7 +23,7 @@ public class User {
     @Column(name = "user_id")
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
@@ -47,7 +47,7 @@ public class User {
     @Column(name = "phone_number", length = 15)
     private String phoneNumber;
 
-    @Size(max = 255)
+    @Size(max = 512)
     @Column(name = "avatar_url")
     private String avatarUrl;
 

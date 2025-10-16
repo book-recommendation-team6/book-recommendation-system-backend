@@ -11,9 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Map;
@@ -23,6 +23,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
@@ -53,10 +54,10 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
             userRepository.save(user);
         }
 
-        return new DefaultOAuth2User(
-                Set.of(new SimpleGrantedAuthority(user.getRole().getName())),
+        return new CustomOAuth2User(
+                user,
                 attributes,
-                "email"
+                Set.of(new SimpleGrantedAuthority(user.getRole().getName()))
         );
     }
 

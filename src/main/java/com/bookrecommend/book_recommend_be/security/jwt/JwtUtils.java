@@ -48,6 +48,18 @@ public class JwtUtils {
                 .compact();
     }
 
+    public String generateToken(String email, Long userId, String roleName) {
+        return Jwts.builder()
+                .subject(email)
+                .claim("id", userId)
+                .claim("roles", List.of(roleName))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expireTime))
+                .id(UUID.randomUUID().toString())
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     public String getEmailFromToken(String token) {
         try {
             Claims claims = Jwts

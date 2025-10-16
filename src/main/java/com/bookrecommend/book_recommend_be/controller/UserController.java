@@ -3,10 +3,14 @@ package com.bookrecommend.book_recommend_be.controller;
 import com.bookrecommend.book_recommend_be.dto.request.UpdateUserRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.UserResponse;
+import com.bookrecommend.book_recommend_be.model.User;
+import com.bookrecommend.book_recommend_be.repository.UserRepository;
+import com.bookrecommend.book_recommend_be.security.userdetails.AppUserDetails;
 import com.bookrecommend.book_recommend_be.service.user.IUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final IUserService userService;
+    private final UserRepository userRepository;
 
     @PutMapping("/{id}/update")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(@PathVariable Long id,
@@ -33,5 +38,18 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> unbanUser(@PathVariable Long id) {
         UserResponse response = userService.unbanUser(id);
         return ResponseEntity.ok(ApiResponse.success(response, "User banned successfully"));
+    }
+
+    @GetMapping("/profile")
+    public User getProfile(@AuthenticationPrincipal AppUserDetails userDetails) {
+        if (userDetails == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+
+        User user = userRepository.findByEmail(userDetails.getEmail());
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
+        return user;
     }
 }

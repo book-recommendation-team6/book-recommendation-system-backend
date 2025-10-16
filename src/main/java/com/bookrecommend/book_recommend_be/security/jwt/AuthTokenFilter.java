@@ -39,14 +39,16 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             log.error("Cannot set user authentication for request: {} {}",
                     request.getMethod(), request.getRequestURI(), e);
         }
-
         filterChain.doFilter(request, response);
     }
 
     private void authenticateUser(String jwt) {
         try {
-            String username = jwtUtils.getEmailFromToken(jwt);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            String email = jwtUtils.getEmailFromToken(jwt);
+            log.info("🔐 Extracted email from JWT: {}", email);
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            log.info("✅ Loaded user details for: {}", userDetails.getUsername());
 
             var authentication = new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
