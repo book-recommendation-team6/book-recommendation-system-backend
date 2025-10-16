@@ -51,9 +51,17 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
-//                        .requestMatchers(API + "/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(API + "/auth/**").permitAll()
-                        .anyRequest().permitAll())
+                        .requestMatchers(HttpMethod.GET, API + "/books", API + "/books/newest", API + "/books/most-read", 
+                                        API + "/books/genre/**", API + "/books/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/download/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, API + "/books/create-with-files").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, API + "/books/update-with-files/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, API + "/books/add").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, API + "/books/update/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, API + "/books/delete/**").hasAuthority("ADMIN")
+                        .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oAuth2UserService))

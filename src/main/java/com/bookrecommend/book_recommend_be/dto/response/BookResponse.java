@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,4 +20,34 @@ public class BookResponse {
     String publisher;
     Instant createdAt;
     Instant updatedAt;
+    Set<AuthorInfo> authors;
+    Set<GenreInfo> genres;
+    List<FormatInfo> formats;
+    
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Data
+    public static class AuthorInfo {
+        Long id;
+        String name;
+    }
+    
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Data
+    public static class GenreInfo {
+        Long id;
+        String name;
+    }
+    
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Data
+    public static class FormatInfo {
+        Long id;
+        String typeName;
+        Integer totalPages;
+        Integer fileSizeKb;
+        String contentUrl;
+    }
 }
