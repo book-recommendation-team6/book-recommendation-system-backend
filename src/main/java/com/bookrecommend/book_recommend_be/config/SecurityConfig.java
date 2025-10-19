@@ -77,13 +77,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(authEndpoints).permitAll()
                         .requestMatchers(HttpMethod.GET, bookEndpoints).permitAll()
-                        .requestMatchers(adminEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.PUT, bookEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.DELETE, bookEndpoints).hasAuthority("Admin")
+                        .requestMatchers(adminEndpoints).hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, bookEndpoints).hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, bookEndpoints).hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PATCH,
                                 API + "/users/*/ban",
-                                API + "/users/*/unban").hasAuthority("Admin")
+                                API + "/users/*/unban").hasAuthority("ADMIN")
                         .requestMatchers(userEndpoints).authenticated()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2

@@ -6,6 +6,9 @@ import com.bookrecommend.book_recommend_be.exceptions.ResourceNotFoundException;
 import com.bookrecommend.book_recommend_be.model.User;
 import com.bookrecommend.book_recommend_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +39,14 @@ public class UserService implements IUserService {
 
         User updatedUser = userRepository.save(user);
         return mapToResponse(updatedUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getAllUsers(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return userRepository.findAll(pageable)
+                .map(this::mapToResponse);
     }
 
     @Override
