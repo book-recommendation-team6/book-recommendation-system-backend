@@ -60,11 +60,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        String adminEndpoints = API + "/admin/**";
-        String authEndpoints = API + "/auth/**";
-        String bookEndpoints = API + "/books/**";
-        String userEndpoints = API + "/users/**";
-
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -73,18 +68,17 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(authEndpoints).permitAll()
-                        .requestMatchers(HttpMethod.GET, bookEndpoints).permitAll()
-                        .requestMatchers(adminEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.PUT, bookEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.DELETE, bookEndpoints).hasAuthority("Admin")
-                        .requestMatchers(HttpMethod.PATCH,
-                                API + "/users/*/ban",
-                                API + "/users/*/unban").hasAuthority("Admin")
-                        .requestMatchers(userEndpoints).authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS).permitAll()
+                        .requestMatchers(API + "/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books", API + "/books/newest", API + "/books/most-read",
+                                        API + "/books/genre/**", API + "/books/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/download/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, API + "/books/create-with-files").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, API + "/books/update-with-files/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, API + "/books/add").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, API + "/books/update/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, API + "/books/delete/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
