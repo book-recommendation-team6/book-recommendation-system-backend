@@ -66,6 +66,7 @@ public class SecurityConfig {
         String bookEndpoints = API + "/books/**";
         String userEndpoints = API + "/users/**";
         String authorEndpoints = API + "/authors/**";
+        String genreEndpoints = API + "/genres/**";
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -80,6 +81,7 @@ public class SecurityConfig {
                         .requestMatchers(API + "/upload").permitAll()
                         .requestMatchers(HttpMethod.GET, authorEndpoints).permitAll()
                         .requestMatchers(HttpMethod.GET, bookEndpoints).permitAll()
+                        .requestMatchers(HttpMethod.GET, genreEndpoints).permitAll()
                         .requestMatchers(adminEndpoints).hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, bookEndpoints).hasAuthority("ADMIN")

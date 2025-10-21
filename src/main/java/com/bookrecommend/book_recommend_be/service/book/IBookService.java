@@ -1,6 +1,7 @@
 package com.bookrecommend.book_recommend_be.service.book;
 
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
+import com.bookrecommend.book_recommend_be.dto.request.CreateBookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import org.springframework.data.domain.Page;
 
@@ -18,6 +19,8 @@ public interface IBookService {
     BookResponse createBook(BookRequest request);
 
     BookResponse updateBook(Long id, BookRequest request);
+
+    BookResponse createBook(CreateBookRequest request) throws Exception;
 
     void deleteBook(Long id);
 

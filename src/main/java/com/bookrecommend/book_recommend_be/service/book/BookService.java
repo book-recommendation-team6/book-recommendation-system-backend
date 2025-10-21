@@ -8,8 +8,10 @@ import com.bookrecommend.book_recommend_be.repository.AuthorRepository;
 import com.bookrecommend.book_recommend_be.repository.BookRepository;
 import com.bookrecommend.book_recommend_be.repository.BookTypeRepository;
 import com.bookrecommend.book_recommend_be.repository.GenreRepository;
+import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ public class BookService implements IBookService {
     private final GenreRepository genreRepository;
     private final BookTypeRepository bookTypeRepository;
     private final ModelMapper modelMapper;
+    private final MinioClient minioClient;
 
     @Override
     public Page<BookResponse> getBooks(int page, int size) {
