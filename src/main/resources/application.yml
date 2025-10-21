@@ -5,9 +5,9 @@ spring:
   application:
     name: "Book Recommendation System"
   datasource:
-    url: jdbc:postgresql://localhost:5432/recommendation_book_system_db
+    url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
-    password: 123
+    password: 2592004!?
     driver-class-name: org.postgresql.Driver
 
   jpa:
