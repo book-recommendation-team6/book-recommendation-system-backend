@@ -53,6 +53,13 @@ spring:
             user-info-uri: https://graph.facebook.com/me?fields=id,name,email,picture
             user-name-attribute: id
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 25MB
+      max-request-size: 30MB
+      file-size-threshold: 2MB
+
 api:
   prefix: /api/v1
 cors:
@@ -69,17 +76,16 @@ app:
     verification-url: ${APP_AUTH_VERIFICATION_URL:http://localhost:8080/api/v1/auth/verify-email?token=}
     reset-password-url: ${APP_AUTH_RESET_PASSWORD_URL:http://localhost:5173/reset-password?token=}
 
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 25MB
-      max-request-size: 30MB
-      file-size-threshold: 2MB
-
 file:
-  upload-dir: ${FILE_UPLOAD_DIR:${user.home}/book-recommendation-uploads/books}
+  upload-dir: ${FILE_UPLOAD_DIR:${user.dir}/book-recommendation-uploads/books}
   allowed-extensions: pdf,docx,doc
   max-size-mb: 25
+
+cloudinary:
+  cloudName: ${CLOUDINARY_CLOUD_NAME}
+  apiKey: ${CLOUDINARY_API_KEY}
+  apiSecret: ${CLOUDINARY_API_SECRET}
+  apiSecure: ${CLOUDINARY_API_SECURE:true}
 
 logging:
   level:

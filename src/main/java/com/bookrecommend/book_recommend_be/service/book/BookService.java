@@ -2,12 +2,14 @@ package com.bookrecommend.book_recommend_be.service.book;
 
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
+import com.bookrecommend.book_recommend_be.dto.response.ImageUploadResponse;
 import com.bookrecommend.book_recommend_be.exceptions.ResourceNotFoundException;
 import com.bookrecommend.book_recommend_be.model.*;
 import com.bookrecommend.book_recommend_be.repository.AuthorRepository;
 import com.bookrecommend.book_recommend_be.repository.BookRepository;
 import com.bookrecommend.book_recommend_be.repository.BookTypeRepository;
 import com.bookrecommend.book_recommend_be.repository.GenreRepository;
+import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +19,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +36,7 @@ public class BookService implements IBookService {
     private final GenreRepository genreRepository;
     private final BookTypeRepository bookTypeRepository;
     private final IFileStorageService fileStorageService;
+    private final CloudinaryService cloudinaryService;
     private final ModelMapper modelMapper;
 
     @Override
@@ -107,6 +110,46 @@ public class BookService implements IBookService {
     }
 
     @Override
+    public ImageUploadResponse uploadCoverImage(MultipartFile coverFile) {
+        if (coverFile == null || coverFile.isEmpty()) {
+            throw new IllegalArgumentException("Cover image file must not be empty");
+        }
+        return cloudinaryService.uploadImage(coverFile, "book_recommend/books");
+    }
+
+    @Override
+    @Transactional
+    public BookResponse updateCoverImage(Long bookId, MultipartFile coverFile) {
+        if (coverFile == null || coverFile.isEmpty()) {
+            throw new IllegalArgumentException("Cover image file must not be empty");
+        }
+
+        Book book = findBookOrThrow(bookId);
+        String previousCoverUrl = book.getCoverImageUrl();
+
+        ImageUploadResponse uploadResponse = cloudinaryService.uploadImage(coverFile, "book_recommend/books");
+        String resolvedUrl = StringUtils.hasText(uploadResponse.getSecureUrl())
+                ? uploadResponse.getSecureUrl()
+                : uploadResponse.getUrl();
+
+        book.setCoverImageUrl(resolvedUrl);
+        Book savedBook = bookRepository.save(book);
+
+        if (StringUtils.hasText(previousCoverUrl) && !previousCoverUrl.equals(resolvedUrl)) {
+            cloudinaryService.extractPublicIdFromUrl(previousCoverUrl)
+                    .ifPresent(publicId -> {
+                        try {
+                            cloudinaryService.deleteImage(publicId);
+                        } catch (Exception ex) {
+                            log.warn("Failed to delete old book cover from Cloudinary: {}", publicId, ex);
+                        }
+                    });
+        }
+
+        return mapToBookResponse(savedBook);
+    }
+
+    @Override
     @Transactional
     public BookResponse updateBook(Long id, BookRequest request) {
         Book book = findBookOrThrow(id);
@@ -146,17 +189,17 @@ public class BookService implements IBookService {
     @Transactional
     public void deleteBook(Long id) {
         Book book = findBookOrThrow(id);
-        
+
         // Delete physical files before deleting from database
         List<String> fileUrls = book.getFormats().stream()
                 .map(BookFormat::getContentUrl)
                 .toList();
-        
+
         log.info("Deleting book {} with {} files", id, fileUrls.size());
-        
+
         // Delete from database first (cascade will delete formats)
         bookRepository.delete(book);
-        
+
         // Then delete physical files
         fileUrls.forEach(url -> {
             try {
@@ -165,7 +208,7 @@ public class BookService implements IBookService {
                 log.warn("Failed to delete file: {}, error: {}", url, e.getMessage());
             }
         });
-        
+
         log.info("Book {} deleted successfully", id);
     }
 
@@ -180,17 +223,17 @@ public class BookService implements IBookService {
             List<String> authorNames,
             List<Long> genreIds,
             MultipartFile file) {
-        
+
         log.info("Creating book with file: {}", title);
-        
+
         validateBookInput(title, description, authorNames, genreIds);
-        
+
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File must be provided");
         }
-        
+
         List<Genre> genres = validateGenres(genreIds);
-        
+
         Book book = new Book();
         book.setTitle(title);
         book.setDescription(description);
@@ -201,14 +244,14 @@ public class BookService implements IBookService {
         book.setGenres(new HashSet<>(genres));
 
         String uploadedFileUrl = null;
-        
+
         try {
             // Detect format type from file extension
             String formatType = detectFormatType(file);
-            
+
             // Upload file
             uploadedFileUrl = fileStorageService.storeFile(file, title, formatType);
-            
+
             // Create book format
             BookType bookType = getOrCreateBookType(formatType);
             BookFormat format = new BookFormat();
@@ -217,13 +260,13 @@ public class BookService implements IBookService {
             format.setContentUrl(uploadedFileUrl);
             format.setTotalPages(null);
             format.setFileSizeKb(fileStorageService.getFileSizeInKb(file));
-            
+
             book.setFormats(List.of(format));
             Book savedBook = bookRepository.save(book);
-            
+
             log.info("Book created successfully with {} format", formatType);
             return mapToBookResponse(savedBook);
-            
+
         } catch (Exception e) {
             log.error("Failed to create book, rolling back uploaded file", e);
             if (uploadedFileUrl != null) {
@@ -245,11 +288,11 @@ public class BookService implements IBookService {
             List<String> authorNames,
             List<Long> genreIds,
             MultipartFile file) {
-        
+
         log.info("Updating book with file: {}", id);
-        
+
         Book book = findBookOrThrow(id);
-        
+
         book.setTitle(title);
         book.setDescription(description);
         book.setCoverImageUrl(coverImageUrl);
@@ -264,20 +307,20 @@ public class BookService implements IBookService {
 
         String oldFileUrl = null;
         String newFileUrl = null;
-        
+
         try {
             // Detect format type from file
             String formatType = detectFormatType(file);
-            
+
             // Find existing format of this type
             BookFormat existingFormat = book.getFormats().stream()
                     .filter(f -> f.getType().getName().equalsIgnoreCase(formatType))
                     .findFirst()
                     .orElse(null);
-            
+
             // Upload new file
             newFileUrl = fileStorageService.storeFile(file, title, formatType);
-            
+
             if (existingFormat != null) {
                 // Update existing format
                 oldFileUrl = existingFormat.getContentUrl();
@@ -297,17 +340,17 @@ public class BookService implements IBookService {
                 book.getFormats().add(newFormat);
                 log.info("Added new {} format", formatType);
             }
-            
+
             Book updatedBook = bookRepository.save(book);
-            
+
             // Delete old file after successful save
             if (oldFileUrl != null) {
                 fileStorageService.deleteFile(oldFileUrl);
             }
-            
+
             log.info("Book updated successfully with {} format", formatType);
             return mapToBookResponse(updatedBook);
-            
+
         } catch (Exception e) {
             log.error("Failed to update book, rolling back uploaded file", e);
             if (newFileUrl != null) {
@@ -323,11 +366,11 @@ public class BookService implements IBookService {
         return bookRepository.searchBooks(keyword, pageable)
                 .map(this::mapToBookResponse);
     }
-    
+
     @Override
     public String getBookFormatUrl(Long bookId, Long formatId) {
         Book book = findBookOrThrow(bookId);
-        
+
         return book.getFormats().stream()
                 .filter(f -> f.getId().equals(formatId))
                 .map(BookFormat::getContentUrl)
@@ -345,19 +388,19 @@ public class BookService implements IBookService {
         response.setPublisher(book.getPublisher());
         response.setCreatedAt(book.getCreatedAt());
         response.setUpdatedAt(book.getUpdatedAt());
-        
+
         // Map authors
         Set<BookResponse.AuthorInfo> authors = book.getAuthors().stream()
                 .map(author -> new BookResponse.AuthorInfo(author.getId(), author.getName()))
                 .collect(java.util.stream.Collectors.toSet());
         response.setAuthors(authors);
-        
+
         // Map genres
         Set<BookResponse.GenreInfo> genres = book.getGenres().stream()
                 .map(genre -> new BookResponse.GenreInfo(genre.getId(), genre.getName()))
                 .collect(java.util.stream.Collectors.toSet());
         response.setGenres(genres);
-        
+
         // Map formats
         List<BookResponse.FormatInfo> formats = book.getFormats().stream()
                 .map(format -> new BookResponse.FormatInfo(
@@ -368,15 +411,15 @@ public class BookService implements IBookService {
                         format.getContentUrl()))
                 .collect(java.util.stream.Collectors.toList());
         response.setFormats(formats);
-        
+
         return response;
     }
-    
+
     private Book findBookOrThrow(Long id) {
         return bookRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + id));
     }
-    
+
     private void validateBookInput(String title, String description, List<String> authorNames, List<Long> genreIds) {
         if (title == null || title.trim().isEmpty()) {
             throw new IllegalArgumentException("Title is required");
@@ -391,7 +434,7 @@ public class BookService implements IBookService {
             throw new IllegalArgumentException("At least one genre is required");
         }
     }
-    
+
     private List<Genre> validateGenres(List<Long> genreIds) {
         List<Genre> genres = genreRepository.findAllById(genreIds);
         if (genres.size() != genreIds.size()) {
@@ -399,7 +442,7 @@ public class BookService implements IBookService {
         }
         return genres;
     }
-    
+
     private Set<Author> resolveAuthors(List<String> authorNames) {
         Set<Author> authors = new HashSet<>();
         for (String authorName : authorNames) {
@@ -413,19 +456,19 @@ public class BookService implements IBookService {
         }
         return authors;
     }
-    
+
     private String detectFormatType(MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             throw new IllegalArgumentException("File name is empty");
         }
-        
+
         String extension = "";
         int lastDotIndex = originalFilename.lastIndexOf(".");
         if (lastDotIndex > 0) {
             extension = originalFilename.substring(lastDotIndex + 1).toLowerCase();
         }
-        
+
         return switch (extension) {
             case "pdf" -> "PDF";
             case "docx" -> "DOCX";
@@ -433,7 +476,7 @@ public class BookService implements IBookService {
             default -> throw new IllegalArgumentException("Unsupported file type. Only PDF, DOCX, and DOC are allowed");
         };
     }
-    
+
     private synchronized BookType getOrCreateBookType(String typeName) {
         return bookTypeRepository.findByName(typeName)
                 .orElseGet(() -> {

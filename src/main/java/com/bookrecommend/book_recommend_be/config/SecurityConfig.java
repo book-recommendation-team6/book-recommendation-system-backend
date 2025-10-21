@@ -4,7 +4,6 @@ import com.bookrecommend.book_recommend_be.security.jwt.AuthTokenFilter;
 import com.bookrecommend.book_recommend_be.security.jwt.JwtEntryPoint;
 import com.bookrecommend.book_recommend_be.security.oauth2.OAuth2FailureHandler;
 import com.bookrecommend.book_recommend_be.security.oauth2.OAuth2SuccessHandler;
-import com.bookrecommend.book_recommend_be.security.userdetails.AppUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -31,7 +30,6 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final AppUserDetailsService userDetailsService;
     private final JwtEntryPoint authEntryPoint;
     private final AuthTokenFilter authTokenFilter;
     private final OAuth2UserService<OAuth2UserRequest, OAuth2User> oAuth2UserService;
@@ -71,7 +69,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .requestMatchers(API + "/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, API + "/books", API + "/books/newest", API + "/books/most-read",
-                                        API + "/books/genre/**", API + "/books/search").permitAll()
+                                API + "/books/genre/**", API + "/books/search").permitAll()
                         .requestMatchers(HttpMethod.GET, API + "/books/{bookId}").permitAll()
                         .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/download/**").authenticated()
                         .requestMatchers(HttpMethod.POST, API + "/books/create-with-files").hasAuthority("ADMIN")

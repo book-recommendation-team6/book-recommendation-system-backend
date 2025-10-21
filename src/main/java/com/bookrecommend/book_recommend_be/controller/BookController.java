@@ -3,6 +3,7 @@ package com.bookrecommend.book_recommend_be.controller;
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
+import com.bookrecommend.book_recommend_be.dto.response.ImageUploadResponse;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -109,6 +110,13 @@ public class BookController {
                 .body(ApiResponse.success(createdBook, "Book created with files successfully"));
     }
 
+    @PostMapping(value = "/cover/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadBookCover(
+            @RequestPart("cover") MultipartFile coverFile) {
+        ImageUploadResponse response = bookService.uploadCoverImage(coverFile);
+        return ResponseEntity.ok(ApiResponse.success(response, "Book cover uploaded successfully"));
+    }
+
     @PutMapping("/update/{id}")
     public ResponseEntity<ApiResponse<BookResponse>> updateBook(@PathVariable Long id,
                                                                 @Valid @RequestBody BookRequest request) {
@@ -133,6 +141,14 @@ public class BookController {
                 authorNames, genreIds, file);
         
         return ResponseEntity.ok(ApiResponse.success(updatedBook, "Book updated with files successfully"));
+    }
+
+    @PatchMapping(value = "/{id}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<BookResponse>> updateBookCover(
+            @PathVariable Long id,
+            @RequestPart("cover") MultipartFile coverFile) {
+        BookResponse updatedBook = bookService.updateCoverImage(id, coverFile);
+        return ResponseEntity.ok(ApiResponse.success(updatedBook, "Book cover updated successfully"));
     }
 
     @DeleteMapping("/delete/{id}")

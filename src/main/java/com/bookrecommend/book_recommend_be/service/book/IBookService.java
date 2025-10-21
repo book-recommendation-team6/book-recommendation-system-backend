@@ -2,6 +2,7 @@ package com.bookrecommend.book_recommend_be.service.book;
 
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
+import com.bookrecommend.book_recommend_be.dto.response.ImageUploadResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,6 +20,10 @@ public interface IBookService {
     BookResponse getBookById(Long id);
 
     BookResponse createBook(BookRequest request);
+
+    ImageUploadResponse uploadCoverImage(MultipartFile coverFile);
+
+    BookResponse updateCoverImage(Long bookId, MultipartFile coverFile);
     
     BookResponse createBookWithFiles(
         String title,

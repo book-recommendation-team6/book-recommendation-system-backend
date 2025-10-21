@@ -33,6 +33,4 @@ build/
 
 ### VS Code ###
 .vscode/
-.gitignore
 src/main/resources/application.yml
-.DS_Store

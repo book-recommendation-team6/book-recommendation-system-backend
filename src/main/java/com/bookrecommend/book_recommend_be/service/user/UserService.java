@@ -5,16 +5,21 @@ import com.bookrecommend.book_recommend_be.dto.response.UserResponse;
 import com.bookrecommend.book_recommend_be.exceptions.ResourceNotFoundException;
 import com.bookrecommend.book_recommend_be.model.User;
 import com.bookrecommend.book_recommend_be.repository.UserRepository;
+import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService implements IUserService {
 
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -36,6 +41,38 @@ public class UserService implements IUserService {
 
         User updatedUser = userRepository.save(user);
         return mapToResponse(updatedUser);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateUserAvatar(Long userId, MultipartFile avatarFile) {
+        if (avatarFile == null || avatarFile.isEmpty()) {
+            throw new IllegalArgumentException("Avatar file must not be empty");
+        }
+
+        User user = findUserOrThrow(userId);
+        String previousAvatarUrl = user.getAvatarUrl();
+
+        var uploadResponse = cloudinaryService.uploadImage(avatarFile, "book_recommend/users");
+        String resolvedUrl = StringUtils.hasText(uploadResponse.getSecureUrl())
+                ? uploadResponse.getSecureUrl()
+                : uploadResponse.getUrl();
+
+        user.setAvatarUrl(resolvedUrl);
+        User savedUser = userRepository.save(user);
+
+        if (StringUtils.hasText(previousAvatarUrl) && !previousAvatarUrl.equals(resolvedUrl)) {
+            cloudinaryService.extractPublicIdFromUrl(previousAvatarUrl)
+                    .ifPresent(publicId -> {
+                        try {
+                            cloudinaryService.deleteImage(publicId);
+                        } catch (Exception ex) {
+                            log.warn("Failed to delete old avatar from Cloudinary: {}", publicId, ex);
+                        }
+                    });
+        }
+
+        return mapToResponse(savedUser);
     }
 
     @Override

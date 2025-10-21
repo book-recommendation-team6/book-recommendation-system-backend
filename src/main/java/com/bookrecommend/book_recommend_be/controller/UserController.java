@@ -9,9 +9,11 @@ import com.bookrecommend.book_recommend_be.security.userdetails.AppUserDetails;
 import com.bookrecommend.book_recommend_be.service.user.IUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("${api.prefix}/users")
@@ -26,6 +28,13 @@ public class UserController {
                                                                 @Valid @RequestBody UpdateUserRequest request) {
         UserResponse response = userService.updateUser(id, request);
         return ResponseEntity.ok(ApiResponse.success(response, "User information updated successfully"));
+    }
+
+    @PatchMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserAvatar(@PathVariable Long id,
+                                                                      @RequestPart("avatar") MultipartFile avatarFile) {
+        UserResponse response = userService.updateUserAvatar(id, avatarFile);
+        return ResponseEntity.ok(ApiResponse.success(response, "User avatar updated successfully"));
     }
 
     @PatchMapping("/{id}/ban")
