@@ -5,19 +5,17 @@ import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.dto.response.ImageUploadResponse;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
-import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
-import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -26,7 +24,6 @@ import java.util.List;
 public class BookController {
 
     private final IBookService bookService;
-    private final IFileStorageService fileStorageService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getBooks(
@@ -158,33 +155,14 @@ public class BookController {
     }
     
     @GetMapping("/{bookId}/download/{formatId}")
-    public ResponseEntity<Resource> downloadBookFile(
+    public ResponseEntity<Void> downloadBookFile(
             @PathVariable Long bookId,
-            @PathVariable Long formatId,
-            HttpServletRequest request) {
-        
-        // Get format by calling service method that will be added
-        String fileUrl = bookService.getBookFormatUrl(bookId, formatId);
-        
-        // Load file as Resource
-        Resource resource = fileStorageService.loadFileAsResource(fileUrl);
-        
-        // Determine content type
-        String contentType = null;
-        try {
-            contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
-        } catch (Exception e) {
-            contentType = "application/octet-stream";
-        }
-        
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
-        
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, 
-                        "attachment; filename=\"" + resource.getFilename() + "\"")
-                .body(resource);
+            @PathVariable Long formatId) {
+
+        String downloadUrl = bookService.getBookFormatUrl(bookId, formatId);
+        return ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(URI.create(downloadUrl))
+                .build();
     }
 }

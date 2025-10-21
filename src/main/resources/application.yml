@@ -5,9 +5,9 @@ spring:
   application:
     name: "Book Recommendation System"
   datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
+    url: jdbc:postgresql://localhost:5432/recommendation_book_system_db
     username: postgres
-    password: 2592004!?
+    password: 123
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -63,7 +63,7 @@ spring:
 api:
   prefix: /api/v1
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 auth:
   token:
     jwtSecret: ${JWT_SECRET}
@@ -86,6 +86,14 @@ cloudinary:
   apiKey: ${CLOUDINARY_API_KEY}
   apiSecret: ${CLOUDINARY_API_SECRET}
   apiSecure: ${CLOUDINARY_API_SECURE:true}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:admin}
+  secret-key: ${MINIO_SECRET_KEY:12345678}
+  bucket-name: ${MINIO_BUCKET_NAME:book-files}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
+  presigned-expiry-seconds: ${MINIO_PRESIGNED_EXPIRY_SECONDS:3600}
 
 logging:
   level:

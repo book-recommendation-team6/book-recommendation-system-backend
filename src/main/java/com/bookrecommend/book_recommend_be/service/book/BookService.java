@@ -11,6 +11,8 @@ import com.bookrecommend.book_recommend_be.repository.BookTypeRepository;
 import com.bookrecommend.book_recommend_be.repository.GenreRepository;
 import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
+import com.bookrecommend.book_recommend_be.service.file.PdfToEpubConverter;
+import com.bookrecommend.book_recommend_be.service.file.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +41,7 @@ public class BookService implements IBookService {
     private final IFileStorageService fileStorageService;
     private final CloudinaryService cloudinaryService;
     private final ModelMapper modelMapper;
+    private final PdfToEpubConverter pdfToEpubConverter;
 
     @Override
     public Page<BookResponse> getBooks(int page, int size) {
@@ -232,6 +236,10 @@ public class BookService implements IBookService {
             throw new IllegalArgumentException("File must be provided");
         }
 
+        if (!fileStorageService.isValidBookFile(file)) {
+            throw new IllegalArgumentException("Invalid file type. Only supported book files are allowed");
+        }
+
         List<Genre> genres = validateGenres(genreIds);
 
         Book book = new Book();
@@ -243,25 +251,41 @@ public class BookService implements IBookService {
         book.setAuthors(resolveAuthors(authorNames));
         book.setGenres(new HashSet<>(genres));
 
-        String uploadedFileUrl = null;
+        List<String> uploadedObjectKeys = new ArrayList<>();
 
         try {
-            // Detect format type from file extension
             String formatType = detectFormatType(file);
+            boolean isPdf = fileStorageService.isPdfFile(file);
 
-            // Upload file
-            uploadedFileUrl = fileStorageService.storeFile(file, title, formatType);
+            StoredFile storedOriginal = fileStorageService.storeFile(file, title, formatType);
+            uploadedObjectKeys.add(storedOriginal.objectKey());
 
-            // Create book format
-            BookType bookType = getOrCreateBookType(formatType);
-            BookFormat format = new BookFormat();
-            format.setBook(book);
-            format.setType(bookType);
-            format.setContentUrl(uploadedFileUrl);
-            format.setTotalPages(null);
-            format.setFileSizeKb(fileStorageService.getFileSizeInKb(file));
+            List<BookFormat> formats = new ArrayList<>();
+            BookFormat originalFormat = createBookFormat(book, formatType, storedOriginal);
+            formats.add(originalFormat);
 
-            book.setFormats(List.of(format));
+            if (isPdf) {
+                byte[] pdfBytes = file.getBytes();
+                PdfToEpubConverter.ConversionResult conversionResult = pdfToEpubConverter.convert(pdfBytes, title);
+                StoredFile storedEpub = fileStorageService.storeFile(
+                        conversionResult.epubBytes(),
+                        conversionResult.fileName(),
+                        "application/epub+zip",
+                        title,
+                        "EPUB",
+                        conversionResult.totalPages());
+                uploadedObjectKeys.add(storedEpub.objectKey());
+
+                // Update total pages for PDF format using original document metadata
+                originalFormat.setTotalPages(conversionResult.totalPages());
+
+                BookFormat epubFormat = createBookFormat(book, "EPUB", storedEpub);
+                epubFormat.setTotalPages(conversionResult.totalPages());
+                formats.add(epubFormat);
+            }
+
+            book.setFormats(formats);
+
             Book savedBook = bookRepository.save(book);
 
             log.info("Book created successfully with {} format", formatType);
@@ -269,9 +293,7 @@ public class BookService implements IBookService {
 
         } catch (Exception e) {
             log.error("Failed to create book, rolling back uploaded file", e);
-            if (uploadedFileUrl != null) {
-                fileStorageService.deleteFile(uploadedFileUrl);
-            }
+            uploadedObjectKeys.forEach(fileStorageService::deleteFile);
             throw new RuntimeException("Failed to create book with file: " + e.getMessage(), e);
         }
     }
@@ -305,57 +327,86 @@ public class BookService implements IBookService {
             throw new IllegalArgumentException("File must be provided");
         }
 
-        String oldFileUrl = null;
-        String newFileUrl = null;
+        if (!fileStorageService.isValidBookFile(file)) {
+            throw new IllegalArgumentException("Invalid file type. Only supported book files are allowed");
+        }
+
+        List<String> newlyUploadedKeys = new ArrayList<>();
+        List<String> keysToDeleteAfterUpdate = new ArrayList<>();
 
         try {
             // Detect format type from file
             String formatType = detectFormatType(file);
+            boolean isPdf = fileStorageService.isPdfFile(file);
 
-            // Find existing format of this type
-            BookFormat existingFormat = book.getFormats().stream()
+            StoredFile storedOriginal = fileStorageService.storeFile(file, title, formatType);
+            newlyUploadedKeys.add(storedOriginal.objectKey());
+
+            BookFormat targetFormat = book.getFormats().stream()
                     .filter(f -> f.getType().getName().equalsIgnoreCase(formatType))
                     .findFirst()
-                    .orElse(null);
+                    .orElseGet(() -> {
+                        BookFormat newFormat = new BookFormat();
+                        newFormat.setBook(book);
+                        newFormat.setType(getOrCreateBookType(formatType));
+                        book.getFormats().add(newFormat);
+                        return newFormat;
+                    });
 
-            // Upload new file
-            newFileUrl = fileStorageService.storeFile(file, title, formatType);
+            if (StringUtils.hasText(targetFormat.getContentUrl())) {
+                keysToDeleteAfterUpdate.add(targetFormat.getContentUrl());
+            }
 
-            if (existingFormat != null) {
-                // Update existing format
-                oldFileUrl = existingFormat.getContentUrl();
-                existingFormat.setContentUrl(newFileUrl);
-                existingFormat.setTotalPages(null);
-                existingFormat.setFileSizeKb(fileStorageService.getFileSizeInKb(file));
-                log.info("Updated existing {} format", formatType);
-            } else {
-                // Add new format
-                BookType bookType = getOrCreateBookType(formatType);
-                BookFormat newFormat = new BookFormat();
-                newFormat.setBook(book);
-                newFormat.setType(bookType);
-                newFormat.setContentUrl(newFileUrl);
-                newFormat.setTotalPages(null);
-                newFormat.setFileSizeKb(fileStorageService.getFileSizeInKb(file));
-                book.getFormats().add(newFormat);
-                log.info("Added new {} format", formatType);
+            targetFormat.setContentUrl(storedOriginal.objectKey());
+            targetFormat.setFileSizeKb(fileStorageService.calculateFileSizeKb(storedOriginal.sizeBytes()));
+            targetFormat.setTotalPages(null);
+
+            if (isPdf) {
+                byte[] pdfBytes = file.getBytes();
+                PdfToEpubConverter.ConversionResult conversionResult = pdfToEpubConverter.convert(pdfBytes, title);
+                targetFormat.setTotalPages(conversionResult.totalPages());
+
+                StoredFile storedEpub = fileStorageService.storeFile(
+                        conversionResult.epubBytes(),
+                        conversionResult.fileName(),
+                        "application/epub+zip",
+                        title,
+                        "EPUB",
+                        conversionResult.totalPages());
+                newlyUploadedKeys.add(storedEpub.objectKey());
+
+                BookFormat epubFormat = book.getFormats().stream()
+                        .filter(f -> f.getType().getName().equalsIgnoreCase("EPUB"))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            BookFormat newFormat = new BookFormat();
+                            newFormat.setBook(book);
+                            newFormat.setType(getOrCreateBookType("EPUB"));
+                            book.getFormats().add(newFormat);
+                            return newFormat;
+                        });
+
+                if (StringUtils.hasText(epubFormat.getContentUrl())) {
+                    keysToDeleteAfterUpdate.add(epubFormat.getContentUrl());
+                }
+
+                epubFormat.setContentUrl(storedEpub.objectKey());
+                epubFormat.setFileSizeKb(fileStorageService.calculateFileSizeKb(storedEpub.sizeBytes()));
+                epubFormat.setTotalPages(conversionResult.totalPages());
             }
 
             Book updatedBook = bookRepository.save(book);
 
-            // Delete old file after successful save
-            if (oldFileUrl != null) {
-                fileStorageService.deleteFile(oldFileUrl);
-            }
+            keysToDeleteAfterUpdate.stream()
+                    .filter(StringUtils::hasText)
+                    .forEach(fileStorageService::deleteFile);
 
             log.info("Book updated successfully with {} format", formatType);
             return mapToBookResponse(updatedBook);
 
         } catch (Exception e) {
             log.error("Failed to update book, rolling back uploaded file", e);
-            if (newFileUrl != null) {
-                fileStorageService.deleteFile(newFileUrl);
-            }
+            newlyUploadedKeys.forEach(fileStorageService::deleteFile);
             throw new RuntimeException("Failed to update book with file: " + e.getMessage(), e);
         }
     }
@@ -371,11 +422,13 @@ public class BookService implements IBookService {
     public String getBookFormatUrl(Long bookId, Long formatId) {
         Book book = findBookOrThrow(bookId);
 
-        return book.getFormats().stream()
+        String objectKey = book.getFormats().stream()
                 .filter(f -> f.getId().equals(formatId))
                 .map(BookFormat::getContentUrl)
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Format not found with id: " + formatId));
+
+        return fileStorageService.generatePresignedUrl(objectKey);
     }
 
     private BookResponse mapToBookResponse(Book book) {
@@ -403,12 +456,23 @@ public class BookService implements IBookService {
 
         // Map formats
         List<BookResponse.FormatInfo> formats = book.getFormats().stream()
-                .map(format -> new BookResponse.FormatInfo(
-                        format.getId(),
-                        format.getType().getName(),
-                        format.getTotalPages(),
-                        format.getFileSizeKb(),
-                        format.getContentUrl()))
+                .map(format -> {
+                    String contentUrl = null;
+                    if (StringUtils.hasText(format.getContentUrl())) {
+                        try {
+                            contentUrl = fileStorageService.generatePresignedUrl(format.getContentUrl());
+                        } catch (Exception ex) {
+                            log.warn("Failed to generate presigned URL for object {}: {}", format.getContentUrl(), ex.getMessage());
+                            contentUrl = format.getContentUrl();
+                        }
+                    }
+                    return new BookResponse.FormatInfo(
+                            format.getId(),
+                            format.getType().getName(),
+                            format.getTotalPages(),
+                            format.getFileSizeKb(),
+                            contentUrl);
+                })
                 .collect(java.util.stream.Collectors.toList());
         response.setFormats(formats);
 
@@ -491,5 +555,15 @@ public class BookService implements IBookService {
                                 .orElseThrow(() -> new RuntimeException("Failed to create or fetch BookType"));
                     }
                 });
+    }
+
+    private BookFormat createBookFormat(Book book, String formatType, StoredFile storedFile) {
+        BookFormat format = new BookFormat();
+        format.setBook(book);
+        format.setType(getOrCreateBookType(formatType));
+        format.setContentUrl(storedFile.objectKey());
+        format.setFileSizeKb(fileStorageService.calculateFileSizeKb(storedFile.sizeBytes()));
+        format.setTotalPages(storedFile.totalPages());
+        return format;
     }
 }

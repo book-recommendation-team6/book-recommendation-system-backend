@@ -1,140 +1,127 @@
 package com.bookrecommend.book_recommend_be.service.file;
 
+import com.bookrecommend.book_recommend_be.config.MinioProperties;
+import io.minio.*;
+import io.minio.errors.MinioException;
+import io.minio.http.Method;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.text.SimpleDateFormat;
+import java.io.InputStream;
+import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class FileStorageService implements IFileStorageService {
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
-    
+    private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private final MinioClient minioClient;
+    private final MinioProperties minioProperties;
     @Value("${file.allowed-extensions}")
     private String allowedExtensions;
-    
     @Value("${file.max-size-mb}")
     private long maxSizeMb;
-    
-    private Path baseStorageLocation;
     private List<String> allowedExtensionsList;
     private long maxSizeBytes;
-    
+
     @PostConstruct
     public void init() {
-        // Parse allowed extensions
-        this.allowedExtensionsList = Arrays.asList(allowedExtensions.split(","));
+        this.allowedExtensionsList = Arrays.stream(allowedExtensions.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.toLowerCase(Locale.ROOT))
+                .toList();
         this.maxSizeBytes = maxSizeMb * 1024 * 1024;
-        
-        // Create base upload directory
-        this.baseStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
-        
-        try {
-            Files.createDirectories(this.baseStorageLocation);
-            log.info("Created base file storage directory: {}", this.baseStorageLocation);
-        } catch (Exception ex) {
-            log.error("Could not create base upload directory", ex);
-            throw new RuntimeException("Could not create base upload directory", ex);
-        }
+        ensureBucket();
     }
 
     @Override
-    public String storeFile(MultipartFile file, String bookTitle, String formatType) {
+    public StoredFile storeFile(MultipartFile file, String bookTitle, String formatType) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");
         }
-
-        // Validate file
         if (!isValidBookFile(file)) {
             throw new IllegalArgumentException("Invalid file type. Only " + allowedExtensions + " files are allowed");
         }
-
         if (file.getSize() > maxSizeBytes) {
             throw new IllegalArgumentException("File size exceeds maximum limit of " + maxSizeMb + "MB");
         }
 
         String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
-        String fileExtension = getFileExtension(originalFilename);
-        
-        // Clean book title for filename
-        String sanitizedBookTitle = bookTitle
-                .replaceAll("[^a-zA-Z0-9\\s-]", "")
-                .replaceAll("\\s+", "_")
-                .toLowerCase();
-        sanitizedBookTitle = sanitizedBookTitle.substring(0, Math.min(sanitizedBookTitle.length(), 50));
-        // Generate unique filename
-        String fileName = String.format("%s_%s_%s.%s",
-                sanitizedBookTitle,
-                formatType.toLowerCase(),
-                UUID.randomUUID().toString().substring(0, 8),
-                fileExtension);
+        String extension = getFileExtension(originalFilename);
+        String objectName = buildObjectName(bookTitle, formatType, extension);
+        String contentType = StringUtils.hasText(file.getContentType())
+                ? file.getContentType()
+                : "application/octet-stream";
 
-        // Generate date folder dynamically
-        String dateFolder = new SimpleDateFormat("yyyy/MM").format(new Date());
-        Path fileStorageLocation = baseStorageLocation.resolve(dateFolder);
+        try (InputStream inputStream = file.getInputStream()) {
+            putObject(objectName, inputStream, file.getSize(), contentType);
 
-        try {
-            // Security check
-            if (fileName.contains("..")) {
-                throw new RuntimeException("Invalid file path");
-            }
-
-            // Create date subfolder if not exists
-            Files.createDirectories(fileStorageLocation);
-            
-            Path targetLocation = fileStorageLocation.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            
-            log.info("File stored successfully: {}", targetLocation);
-            
-            // Return relative path for URL
-            return "/uploads/books/" + dateFolder + "/" + fileName;
-            
-        } catch (IOException ex) {
-            log.error("Failed to store file: {}", fileName, ex);
-            throw new RuntimeException("Could not store file. Please try again!", ex);
+            log.info("Stored file in MinIO: {}", objectName);
+            return StoredFile.builder()
+                    .objectKey(objectName)
+                    .fileName(originalFilename)
+                    .sizeBytes(file.getSize())
+                    .contentType(contentType)
+                    .totalPages(null)
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read input file", e);
         }
     }
 
     @Override
-    public void deleteFile(String fileUrl) {
-        if (fileUrl == null || fileUrl.isEmpty()) {
+    public StoredFile storeFile(byte[] data, String fileName, String contentType, String bookTitle, String formatType, Integer totalPages) {
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("File data is empty");
+        }
+        String effectiveFileName = StringUtils.hasText(fileName) ? fileName : formatType.toLowerCase(Locale.ROOT) + "-" + UUID.randomUUID() + ".bin";
+        String extension = getFileExtension(effectiveFileName);
+        String objectName = buildObjectName(bookTitle, formatType, extension);
+        String resolvedContentType = StringUtils.hasText(contentType) ? contentType : guessContentType(extension);
+
+        try (InputStream inputStream = new ByteArrayInputStream(data)) {
+            putObject(objectName, inputStream, data.length, resolvedContentType);
+            log.info("Stored derived file in MinIO: {}", objectName);
+            return StoredFile.builder()
+                    .objectKey(objectName)
+                    .fileName(effectiveFileName)
+                    .sizeBytes(data.length)
+                    .contentType(resolvedContentType)
+                    .totalPages(totalPages)
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to store generated file", e);
+        }
+    }
+
+    @Override
+    public void deleteFile(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
             return;
         }
-
         try {
-            // Extract relative path from URL
-            String relativePath = fileUrl.replace("/uploads/books/", "");
-            Path filePath = Paths.get(uploadDir).resolve(relativePath).normalize();
-            if (!filePath.startsWith(baseStorageLocation)) {
-                throw new SecurityException("Access denied");
-            }
-            
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("Deleted file: {}", filePath);
-            }
-        } catch (IOException ex) {
-            log.error("Failed to delete file: {}", fileUrl, ex);
-            // Don't throw exception for delete failures
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .object(objectKey)
+                    .build());
+            log.info("Deleted file from MinIO: {}", objectKey);
+        } catch (Exception e) {
+            log.warn("Failed to delete file '{}' from MinIO: {}", objectKey, e.getMessage());
         }
     }
 
@@ -143,77 +130,144 @@ public class FileStorageService implements IFileStorageService {
         if (file == null || file.isEmpty()) {
             return false;
         }
-
         String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null) {
+        if (!StringUtils.hasText(originalFilename)) {
             return false;
         }
-
-        // Check extension
-        String extension = getFileExtension(originalFilename).toLowerCase();
+        String extension = getFileExtension(originalFilename).toLowerCase(Locale.ROOT);
         if (!allowedExtensionsList.contains(extension)) {
             return false;
         }
-        
-        // Validate actual MIME type from file content
         String contentType = file.getContentType();
-        if (contentType == null) {
-            return false;
-        }
-        
-        // Map of allowed MIME types
-        boolean isValidMimeType = switch (extension) {
-            case "pdf" -> contentType.equals("application/pdf");
-            case "docx" -> contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            case "doc" -> contentType.equals("application/msword");
+        return switch (extension) {
+            case "pdf" -> "application/pdf".equalsIgnoreCase(contentType);
+            case "docx" ->
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equalsIgnoreCase(contentType);
+            case "doc" -> "application/msword".equalsIgnoreCase(contentType);
             default -> false;
         };
-        
-        return isValidMimeType;
-    }
-    
-    @Override
-    public Integer getFileSizeInKb(MultipartFile file) {
-        if (file == null) {
-            return null;
-        }
-        return (int) (file.getSize() / 1024);
     }
 
     @Override
-    public Resource loadFileAsResource(String fileUrl) {
-        if (fileUrl == null || fileUrl.isEmpty()) {
-            throw new IllegalArgumentException("File URL is empty");
+    public boolean isPdfFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return false;
         }
+        String originalFilename = file.getOriginalFilename();
+        if (!StringUtils.hasText(originalFilename)) {
+            return false;
+        }
+        return "pdf".equalsIgnoreCase(getFileExtension(originalFilename));
+    }
 
+    @Override
+    public int calculateFileSizeKb(long sizeBytes) {
+        if (sizeBytes <= 0) {
+            return 0;
+        }
+        return (int) Math.max(1, Math.ceil(sizeBytes / 1024.0));
+    }
+
+    @Override
+    public String generatePresignedUrl(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            throw new IllegalArgumentException("Object key must not be empty");
+        }
+        if (StringUtils.hasText(minioProperties.getPublicEndpoint())) {
+            return minioProperties.getPublicEndpoint().replaceAll("/+$", "") + "/"
+                    + minioProperties.getBucketName() + "/" + objectKey;
+        }
         try {
-            // Extract relative path from URL
-            String relativePath = fileUrl.replace("/uploads/books/", "");
-            Path filePath = baseStorageLocation.resolve(relativePath).normalize();
-            if (!filePath.startsWith(baseStorageLocation)) {
-                throw new SecurityException("Access denied");
-            }
-            
-            Resource resource = new UrlResource(filePath.toUri());
-            
-            if (resource.exists() && resource.isReadable()) {
-                return resource;
-            } else {
-                throw new RuntimeException("File not found or not readable: " + fileUrl);
-            }
-        } catch (MalformedURLException ex) {
-            throw new RuntimeException("Invalid file path: " + fileUrl, ex);
+            long configuredExpiry = minioProperties.getPresignedExpirySeconds();
+            int expirySeconds = (int) Math.max(60, Math.min(604800, configuredExpiry));
+            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .object(objectKey)
+                    .method(Method.GET)
+                    .expiry(expirySeconds)
+                    .build());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate presigned URL", e);
         }
     }
-    
+
+    private void ensureBucket() {
+        try {
+            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .build());
+            if (!exists) {
+                minioClient.makeBucket(MakeBucketArgs.builder()
+                        .bucket(minioProperties.getBucketName())
+                        .build());
+                log.info("Created MinIO bucket '{}'", minioProperties.getBucketName());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to verify MinIO bucket", e);
+        }
+    }
+
+    private void putObject(String objectName, InputStream inputStream, long size, String contentType) {
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .object(objectName)
+                    .stream(inputStream, size, -1)
+                    .contentType(contentType)
+                    .build());
+        } catch (Exception e) {
+            if (e instanceof MinioException minioException) {
+                log.error("MinIO error storing object {}: {}", objectName, minioException.getMessage());
+            }
+            throw new RuntimeException("Failed to store file to MinIO", e);
+        }
+    }
+
+    private String buildObjectName(String bookTitle, String formatType, String extension) {
+        String sanitizedTitle = sanitizeTitle(bookTitle);
+        String datePath = DATE_PATH_FORMATTER.format(LocalDate.now());
+        String safeExtension = extension.isBlank() ? "bin" : extension;
+        return String.format("books/%s/%s_%s_%s.%s",
+                datePath,
+                sanitizedTitle,
+                formatType.toLowerCase(Locale.ROOT),
+                UUID.randomUUID().toString().substring(0, 8),
+                safeExtension);
+    }
+
+    private String sanitizeTitle(String title) {
+        if (!StringUtils.hasText(title)) {
+            return "book";
+        }
+        String normalized = Normalizer.normalize(title, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        String sanitized = normalized
+                .replaceAll("[^a-zA-Z0-9\\s-]", "")
+                .trim()
+                .replaceAll("\\s+", "_")
+                .toLowerCase(Locale.ROOT);
+        if (sanitized.length() > 50) {
+            sanitized = sanitized.substring(0, 50);
+        }
+        return sanitized.isBlank() ? "book" : sanitized;
+    }
+
     private String getFileExtension(String filename) {
-        if (filename == null || filename.isEmpty()) {
+        if (!StringUtils.hasText(filename)) {
             return "";
         }
         int lastDotIndex = filename.lastIndexOf(".");
-        if (lastDotIndex == -1) {
+        if (lastDotIndex == -1 || lastDotIndex == filename.length() - 1) {
             return "";
         }
         return filename.substring(lastDotIndex + 1);
+    }
+
+    private String guessContentType(String extension) {
+        return switch (extension.toLowerCase(Locale.ROOT)) {
+            case "pdf" -> "application/pdf";
+            case "epub" -> "application/epub+zip";
+            default -> "application/octet-stream";
+        };
     }
 }
