@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpRequest;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -64,7 +65,7 @@ public class SecurityConfig {
         String authEndpoints = API + "/auth/**";
         String bookEndpoints = API + "/books/**";
         String userEndpoints = API + "/users/**";
-
+        String authorEndpoints = API + "/authors/**";
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -76,6 +77,8 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(authEndpoints).permitAll()
+                        .requestMatchers(API + "/upload").permitAll()
+                        .requestMatchers(HttpMethod.GET, authorEndpoints).permitAll()
                         .requestMatchers(HttpMethod.GET, bookEndpoints).permitAll()
                         .requestMatchers(adminEndpoints).hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, bookEndpoints).hasAuthority("ADMIN")

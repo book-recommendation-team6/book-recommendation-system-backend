@@ -1,10 +1,12 @@
 package com.bookrecommend.book_recommend_be.dto.response;
 
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
+@Builder
 public class ApiResponse<T> {
     private T data;
     private String message;

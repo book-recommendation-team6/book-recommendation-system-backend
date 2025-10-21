@@ -52,7 +52,6 @@ spring:
             token-uri: https://graph.facebook.com/v20.0/oauth/access_token
             user-info-uri: https://graph.facebook.com/me?fields=id,name,email,picture
             user-name-attribute: id
-
 api:
   prefix: /api/v1
 cors:
@@ -69,11 +68,19 @@ app:
     verification-url: ${APP_AUTH_VERIFICATION_URL:http://localhost:8080/api/v1/auth/verify-email?token=}
     reset-password-url: ${APP_AUTH_RESET_PASSWORD_URL:http://localhost:5173/reset-password?token=}
 
+
 logging:
   level:
     #    org.hibernate.SQL: DEBUG
     org.springframework.security: DEBUG
     org.springframework.security.oauth2: DEBUG
+minio:
+  endpoint: http://127.0.0.1:9000      # Endpoint S3 của MinIO
+  region: us-east-1                    # MinIO chấp nhận bất kỳ, dùng mặc định
+  accessKey: admin
+  secretKey: admin12345
+  bucket: book-data
+  presignExpireSeconds: 300            # 5 phút
 #    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 #    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
 #    com.zaxxer.hikari: INFO
