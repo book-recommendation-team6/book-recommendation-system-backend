@@ -3,7 +3,6 @@ package com.bookrecommend.book_recommend_be.controller;
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
-import com.bookrecommend.book_recommend_be.dto.response.ImageUploadResponse;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,11 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 @RestController
 @RequestMapping("${api.prefix}/books")
@@ -73,79 +70,24 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(book, "Book retrieved successfully"));
     }
 
-    @PostMapping("/add")
-    public ResponseEntity<ApiResponse<BookResponse>> createBook(@Valid @RequestBody BookRequest request) {
-        BookResponse createdBook = bookService.createBook(request);
+    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<BookResponse>> createBook(
+            @ModelAttribute @Valid BookRequest request) {
+        BookResponse created = bookService.createBook(request);
         return ResponseEntity
                 .created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{id}")
-                        .buildAndExpand(createdBook.getId())
+                        .buildAndExpand(created.getId())
                         .toUri())
-                .body(ApiResponse.success(createdBook, "Book created successfully"));
-    }
-    
-    @PostMapping(value = "/create-with-files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<BookResponse>> createBookWithFiles(
-            @RequestParam("title") String title,
-            @RequestParam("description") String description,
-            @RequestParam("coverImageUrl") String coverImageUrl,
-            @RequestParam(value = "publicationYear", required = false) Integer publicationYear,
-            @RequestParam(value = "publisher", required = false) String publisher,
-            @RequestParam("authorNames") List<String> authorNames,
-            @RequestParam("genreIds") List<Long> genreIds,
-            @RequestPart("file") MultipartFile file) {
-        
-        BookResponse createdBook = bookService.createBookWithFiles(
-                title, description, coverImageUrl, publicationYear, publisher,
-                authorNames, genreIds, file);
-        
-        return ResponseEntity
-                .created(ServletUriComponentsBuilder.fromCurrentRequest()
-                        .path("/../{id}")
-                        .buildAndExpand(createdBook.getId())
-                        .toUri())
-                .body(ApiResponse.success(createdBook, "Book created with files successfully"));
+                .body(ApiResponse.success(created, "Book created successfully"));
     }
 
-    @PostMapping(value = "/cover/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadBookCover(
-            @RequestPart("cover") MultipartFile coverFile) {
-        ImageUploadResponse response = bookService.uploadCoverImage(coverFile);
-        return ResponseEntity.ok(ApiResponse.success(response, "Book cover uploaded successfully"));
-    }
-
-    @PutMapping("/update/{id}")
-    public ResponseEntity<ApiResponse<BookResponse>> updateBook(@PathVariable Long id,
-                                                                @Valid @RequestBody BookRequest request) {
-        BookResponse updatedBook = bookService.updateBook(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updatedBook, "Book updated successfully"));
-    }
-    
-    @PutMapping(value = "/update-with-files/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<BookResponse>> updateBookWithFiles(
+    @PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<BookResponse>> updateBook(
             @PathVariable Long id,
-            @RequestParam("title") String title,
-            @RequestParam("description") String description,
-            @RequestParam("coverImageUrl") String coverImageUrl,
-            @RequestParam(value = "publicationYear", required = false) Integer publicationYear,
-            @RequestParam(value = "publisher", required = false) String publisher,
-            @RequestParam("authorNames") List<String> authorNames,
-            @RequestParam("genreIds") List<Long> genreIds,
-            @RequestPart("file") MultipartFile file) {
-        
-        BookResponse updatedBook = bookService.updateBookWithFiles(
-                id, title, description, coverImageUrl, publicationYear, publisher,
-                authorNames, genreIds, file);
-        
-        return ResponseEntity.ok(ApiResponse.success(updatedBook, "Book updated with files successfully"));
-    }
-
-    @PatchMapping(value = "/{id}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<BookResponse>> updateBookCover(
-            @PathVariable Long id,
-            @RequestPart("cover") MultipartFile coverFile) {
-        BookResponse updatedBook = bookService.updateCoverImage(id, coverFile);
-        return ResponseEntity.ok(ApiResponse.success(updatedBook, "Book cover updated successfully"));
+            @ModelAttribute @Valid BookRequest request) {
+        BookResponse updated = bookService.updateBook(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Book updated successfully"));
     }
 
     @DeleteMapping("/delete/{id}")
@@ -153,7 +95,7 @@ public class BookController {
         bookService.deleteBook(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Book deleted successfully"));
     }
-    
+
     @GetMapping("/{bookId}/download/{formatId}")
     public ResponseEntity<Void> downloadBookFile(
             @PathVariable Long bookId,
