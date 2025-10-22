@@ -16,13 +16,13 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 
 @RestController
-@RequestMapping("${api.prefix}/books")
+@RequestMapping("${api.prefix}")
 @RequiredArgsConstructor
 public class BookController {
 
     private final IBookService bookService;
 
-    @GetMapping
+    @GetMapping("books")
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getBooks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -30,7 +30,7 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Books retrieved successfully"));
     }
 
-    @GetMapping("/newest")
+    @GetMapping("books/newest")
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getNewestBooks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -38,7 +38,7 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Newest books retrieved successfully"));
     }
 
-    @GetMapping("/most-read")
+    @GetMapping("books/most-read")
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getMostReadBooks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -46,7 +46,7 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Most read books retrieved successfully"));
     }
 
-    @GetMapping("/genre/{genreId}")
+    @GetMapping("books/genre/{genreId}")
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getBooksByGenre(
             @PathVariable Long genreId,
             @RequestParam(defaultValue = "0") int page,
@@ -55,7 +55,7 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Books by genre retrieved successfully"));
     }
 
-    @GetMapping("/search")
+    @GetMapping("books/search")
     public ResponseEntity<ApiResponse<Page<BookResponse>>> searchBooks(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
@@ -64,13 +64,13 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(books, "Books found successfully"));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("books/{id}")
     public ResponseEntity<ApiResponse<BookResponse>> getBookById(@PathVariable Long id) {
         BookResponse book = bookService.getBookById(id);
         return ResponseEntity.ok(ApiResponse.success(book, "Book retrieved successfully"));
     }
 
-    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/admin/books/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<BookResponse>> createBook(
             @ModelAttribute @Valid BookRequest request) {
         BookResponse created = bookService.createBook(request);
@@ -82,7 +82,7 @@ public class BookController {
                 .body(ApiResponse.success(created, "Book created successfully"));
     }
 
-    @PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping(value = "admin/books/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<BookResponse>> updateBook(
             @PathVariable Long id,
             @ModelAttribute @Valid BookRequest request) {
@@ -90,13 +90,13 @@ public class BookController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Book updated successfully"));
     }
 
-    @DeleteMapping("/delete/{id}")
+    @DeleteMapping("admin/books/delete/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteBook(@PathVariable Long id) {
         bookService.deleteBook(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Book deleted successfully"));
     }
 
-    @GetMapping("/{bookId}/download/{formatId}")
+    @GetMapping("books/{bookId}/download/{formatId}")
     public ResponseEntity<Void> downloadBookFile(
             @PathVariable Long bookId,
             @PathVariable Long formatId) {
