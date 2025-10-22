@@ -209,10 +209,11 @@ public class FileStorageService implements IFileStorageService {
 
     private void putObject(String objectName, InputStream inputStream, long size, String contentType) {
         try {
+            long partSize = Math.max(5 * 1024 * 1024, size);
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(minioProperties.getBucketName())
                     .object(objectName)
-                    .stream(inputStream, size, -1)
+                    .stream(inputStream, size, partSize)
                     .contentType(contentType)
                     .build());
         } catch (Exception e) {

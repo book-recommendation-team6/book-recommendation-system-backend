@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -16,10 +17,6 @@ public class BookRequest {
     @NotBlank
     private String description;
 
-    @NotBlank
-    @Size(max = 255)
-    private String coverImageUrl;
-
     private Integer publicationYear;
 
     @Size(max = 100)
@@ -31,6 +28,6 @@ public class BookRequest {
     @NotEmpty(message = "Book must have at least one genre")
     private List<Long> genreIds;
 
-    @NotEmpty(message = "Book must have at least one format")
-    private List<FormatRequest> formats;
+    private MultipartFile cover;
+    private MultipartFile file;
 }
