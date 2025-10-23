@@ -12,14 +12,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -31,20 +28,12 @@ public class FileStorageService implements IFileStorageService {
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private final MinioClient minioClient;
     private final MinioProperties minioProperties;
-    @Value("${file.allowed-extensions}")
-    private String allowedExtensions;
     @Value("${file.max-size-mb}")
     private long maxSizeMb;
-    private List<String> allowedExtensionsList;
     private long maxSizeBytes;
 
     @PostConstruct
     public void init() {
-        this.allowedExtensionsList = Arrays.stream(allowedExtensions.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(s -> s.toLowerCase(Locale.ROOT))
-                .toList();
         this.maxSizeBytes = maxSizeMb * 1024 * 1024;
         ensureBucket();
     }
@@ -55,7 +44,7 @@ public class FileStorageService implements IFileStorageService {
             throw new IllegalArgumentException("File is empty");
         }
         if (!isValidBookFile(file)) {
-            throw new IllegalArgumentException("Invalid file type. Only " + allowedExtensions + " files are allowed");
+            throw new IllegalArgumentException("Invalid file type. Only PDF and EPUB files are allowed");
         }
         if (file.getSize() > maxSizeBytes) {
             throw new IllegalArgumentException("File size exceeds maximum limit of " + maxSizeMb + "MB");
@@ -85,31 +74,6 @@ public class FileStorageService implements IFileStorageService {
     }
 
     @Override
-    public StoredFile storeFile(byte[] data, String fileName, String contentType, String bookTitle, String formatType, Integer totalPages) {
-        if (data == null || data.length == 0) {
-            throw new IllegalArgumentException("File data is empty");
-        }
-        String effectiveFileName = StringUtils.hasText(fileName) ? fileName : formatType.toLowerCase(Locale.ROOT) + "-" + UUID.randomUUID() + ".bin";
-        String extension = getFileExtension(effectiveFileName);
-        String objectName = buildObjectName(bookTitle, formatType, extension);
-        String resolvedContentType = StringUtils.hasText(contentType) ? contentType : guessContentType(extension);
-
-        try (InputStream inputStream = new ByteArrayInputStream(data)) {
-            putObject(objectName, inputStream, data.length, resolvedContentType);
-            log.info("Stored derived file in MinIO: {}", objectName);
-            return StoredFile.builder()
-                    .objectKey(objectName)
-                    .fileName(effectiveFileName)
-                    .sizeBytes(data.length)
-                    .contentType(resolvedContentType)
-                    .totalPages(totalPages)
-                    .build();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to store generated file", e);
-        }
-    }
-
-    @Override
     public void deleteFile(String objectKey) {
         if (!StringUtils.hasText(objectKey)) {
             return;
@@ -135,29 +99,20 @@ public class FileStorageService implements IFileStorageService {
             return false;
         }
         String extension = getFileExtension(originalFilename).toLowerCase(Locale.ROOT);
-        if (!allowedExtensionsList.contains(extension)) {
+        if (!"pdf".equals(extension) && !"epub".equals(extension)) {
             return false;
         }
         String contentType = file.getContentType();
-        return switch (extension) {
-            case "pdf" -> "application/pdf".equalsIgnoreCase(contentType);
-            case "docx" ->
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equalsIgnoreCase(contentType);
-            case "doc" -> "application/msword".equalsIgnoreCase(contentType);
-            default -> false;
-        };
-    }
-
-    @Override
-    public boolean isPdfFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            return false;
+        if ("pdf".equals(extension)) {
+            return contentType == null
+                    || contentType.isBlank()
+                    || "application/pdf".equalsIgnoreCase(contentType)
+                    || "application/octet-stream".equalsIgnoreCase(contentType);
         }
-        String originalFilename = file.getOriginalFilename();
-        if (!StringUtils.hasText(originalFilename)) {
-            return false;
-        }
-        return "pdf".equalsIgnoreCase(getFileExtension(originalFilename));
+        return contentType == null
+                || contentType.isBlank()
+                || "application/epub+zip".equalsIgnoreCase(contentType)
+                || "application/octet-stream".equalsIgnoreCase(contentType);
     }
 
     @Override
@@ -264,11 +219,4 @@ public class FileStorageService implements IFileStorageService {
         return filename.substring(lastDotIndex + 1);
     }
 
-    private String guessContentType(String extension) {
-        return switch (extension.toLowerCase(Locale.ROOT)) {
-            case "pdf" -> "application/pdf";
-            case "epub" -> "application/epub+zip";
-            default -> "application/octet-stream";
-        };
-    }
 }

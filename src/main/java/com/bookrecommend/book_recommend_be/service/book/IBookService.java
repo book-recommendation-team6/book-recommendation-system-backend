@@ -24,5 +24,4 @@ public interface IBookService {
     Page<BookResponse> searchBooks(String keyword, int page, int size);
 
     String getBookFormatUrl(Long bookId, Long formatId);
-
 }

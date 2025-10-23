@@ -11,7 +11,6 @@ import com.bookrecommend.book_recommend_be.repository.BookTypeRepository;
 import com.bookrecommend.book_recommend_be.repository.GenreRepository;
 import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
-import com.bookrecommend.book_recommend_be.service.file.PdfToEpubConverter;
 import com.bookrecommend.book_recommend_be.service.file.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Service
@@ -39,8 +39,6 @@ public class BookService implements IBookService {
     private final BookTypeRepository bookTypeRepository;
     private final IFileStorageService fileStorageService;
     private final CloudinaryService cloudinaryService;
-    private final PdfToEpubConverter pdfToEpubConverter;
-
     @Override
     public Page<BookResponse> getBooks(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -109,24 +107,20 @@ public class BookService implements IBookService {
         validateBookInput(request.getTitle(), request.getDescription(), request.getAuthorNames(), request.getGenreIds());
 
         MultipartFile coverFile = request.getCover();
-        MultipartFile file = request.getFile();
-
         if (coverFile == null || coverFile.isEmpty()) {
             throw new IllegalArgumentException("Cover image is required");
         }
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File must be provided");
-        }
+
+        MultipartFile pdfFile = request.getPdfFile();
+        MultipartFile epubFile = request.getEpubFile();
+
+        validateRequiredFormatFile(pdfFile, "PDF", "pdf");
+        validateRequiredFormatFile(epubFile, "EPUB", "epub");
 
         ImageUploadResponse uploadResponse = cloudinaryService.uploadImage(coverFile, "book_recommend/books");
         String coverImageUrl = uploadResponse.getSecureUrl() != null
                 ? uploadResponse.getSecureUrl()
                 : uploadResponse.getUrl();
-
-
-        if (!fileStorageService.isValidBookFile(file)) {
-            throw new IllegalArgumentException("Invalid file type. Only supported book files are allowed");
-        }
 
         String title = request.getTitle();
         Book book = new Book();
@@ -141,35 +135,15 @@ public class BookService implements IBookService {
         List<String> uploadedObjectKeys = new ArrayList<>();
 
         try {
-            String formatType = detectFormatType(file);
-            boolean isPdf = fileStorageService.isPdfFile(file);
-
-            StoredFile storedOriginal = fileStorageService.storeFile(file, title, formatType);
-            uploadedObjectKeys.add(storedOriginal.objectKey());
-
             List<BookFormat> formats = new ArrayList<>();
-            BookFormat originalFormat = createBookFormat(book, formatType, storedOriginal);
-            formats.add(originalFormat);
 
-            if (isPdf) {
-                byte[] pdfBytes = file.getBytes();
-                PdfToEpubConverter.ConversionResult conversionResult = pdfToEpubConverter.convert(pdfBytes, title);
-                StoredFile storedEpub = fileStorageService.storeFile(
-                        conversionResult.epubBytes(),
-                        conversionResult.fileName(),
-                        "application/epub+zip",
-                        title,
-                        "EPUB",
-                        conversionResult.totalPages());
-                uploadedObjectKeys.add(storedEpub.objectKey());
+            StoredFile pdfStored = fileStorageService.storeFile(pdfFile, title, "PDF");
+            uploadedObjectKeys.add(pdfStored.objectKey());
+            formats.add(createBookFormat(book, "PDF", pdfStored));
 
-                // Update total pages for PDF format using original document metadata
-                originalFormat.setTotalPages(conversionResult.totalPages());
-
-                BookFormat epubFormat = createBookFormat(book, "EPUB", storedEpub);
-                epubFormat.setTotalPages(conversionResult.totalPages());
-                formats.add(epubFormat);
-            }
+            StoredFile epubStored = fileStorageService.storeFile(epubFile, title, "EPUB");
+            uploadedObjectKeys.add(epubStored.objectKey());
+            formats.add(createBookFormat(book, "EPUB", epubStored));
 
             book.setFormats(formats);
 
@@ -188,7 +162,6 @@ public class BookService implements IBookService {
     public BookResponse updateBook(Long id, BookRequest request) {
         Book book = findBookOrThrow(id);
 
-        // --- Update thông tin cơ bản ---
         book.setTitle(request.getTitle());
         book.setDescription(request.getDescription());
         book.setPublicationYear(request.getPublicationYear());
@@ -196,7 +169,6 @@ public class BookService implements IBookService {
         book.setAuthors(resolveAuthors(request.getAuthorNames()));
         book.setGenres(new HashSet<>(validateGenres(request.getGenreIds())));
 
-        // --- Update ảnh bìa nếu có ---
         MultipartFile coverFile = request.getCover();
         if (coverFile != null && !coverFile.isEmpty()) {
             ImageUploadResponse upload = cloudinaryService.uploadImage(coverFile, "book_recommend/books");
@@ -204,56 +176,33 @@ public class BookService implements IBookService {
             book.setCoverImageUrl(newUrl);
         }
 
-        // --- Update file nếu có ---
-        MultipartFile file = request.getFile();
-        if (file != null && !file.isEmpty()) {
-            if (!fileStorageService.isValidBookFile(file))
-                throw new IllegalArgumentException("Invalid file type");
+        MultipartFile newPdfFile = request.getPdfFile();
+        MultipartFile newEpubFile = request.getEpubFile();
 
+        boolean hasPdfUpdate = newPdfFile != null && !newPdfFile.isEmpty();
+        boolean hasEpubUpdate = newEpubFile != null && !newEpubFile.isEmpty();
+
+        if (hasPdfUpdate) {
+            validateFormatFile(newPdfFile, "PDF", "pdf");
+        }
+        if (hasEpubUpdate) {
+            validateFormatFile(newEpubFile, "EPUB", "epub");
+        }
+
+        if (hasPdfUpdate || hasEpubUpdate) {
             List<String> rollbackKeys = new ArrayList<>();
             try {
-                String formatType = detectFormatType(file);
-                boolean isPdf = fileStorageService.isPdfFile(file);
-
-                // Upload bản chính
-                StoredFile stored = fileStorageService.storeFile(file, book.getTitle(), formatType);
-                rollbackKeys.add(stored.objectKey());
-
-                BookFormat target = book.getFormats().stream()
-                        .filter(f -> f.getType().getName().equalsIgnoreCase(formatType))
-                        .findFirst()
-                        .orElseGet(() -> {
-                            BookFormat f = new BookFormat();
-                            f.setBook(book);
-                            f.setType(getOrCreateBookType(formatType));
-                            book.getFormats().add(f);
-                            return f;
-                        });
-
-                target.setContentUrl(stored.objectKey());
-                target.setFileSizeKb(fileStorageService.calculateFileSizeKb(stored.sizeBytes()));
-
-                // Convert PDF -> EPUB
-                if (isPdf) {
-                    PdfToEpubConverter.ConversionResult conv = pdfToEpubConverter.convert(file.getBytes(), book.getTitle());
-                    StoredFile epub = fileStorageService.storeFile(
-                            conv.epubBytes(), conv.fileName(), "application/epub+zip",
-                            book.getTitle(), "EPUB", conv.totalPages());
-                    rollbackKeys.add(epub.objectKey());
-
-                    BookFormat epubFormat = book.getFormats().stream()
-                            .filter(f -> f.getType().getName().equalsIgnoreCase("EPUB"))
-                            .findFirst()
-                            .orElseGet(() -> {
-                                BookFormat newFmt = new BookFormat();
-                                newFmt.setBook(book);
-                                newFmt.setType(getOrCreateBookType("EPUB"));
-                                book.getFormats().add(newFmt);
-                                return newFmt;
-                            });
-                    epubFormat.setContentUrl(epub.objectKey());
-                    epubFormat.setFileSizeKb(fileStorageService.calculateFileSizeKb(epub.sizeBytes()));
-                    epubFormat.setTotalPages(conv.totalPages());
+                if (hasPdfUpdate) {
+                    StoredFile storedPdf = fileStorageService.storeFile(newPdfFile, book.getTitle(), "PDF");
+                    rollbackKeys.add(storedPdf.objectKey());
+                    BookFormat pdfFormat = getOrCreateFormat(book, "PDF");
+                    applyStoredFile(pdfFormat, storedPdf);
+                }
+                if (hasEpubUpdate) {
+                    StoredFile storedEpub = fileStorageService.storeFile(newEpubFile, book.getTitle(), "EPUB");
+                    rollbackKeys.add(storedEpub.objectKey());
+                    BookFormat epubFormat = getOrCreateFormat(book, "EPUB");
+                    applyStoredFile(epubFormat, storedEpub);
                 }
 
             } catch (Exception e) {
@@ -264,6 +213,48 @@ public class BookService implements IBookService {
 
         Book saved = bookRepository.save(book);
         return mapToBookResponse(saved);
+    }
+
+    private void validateRequiredFormatFile(MultipartFile file, String formatLabel, String expectedExtension) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException(formatLabel + " file is required");
+        }
+        validateFormatFile(file, formatLabel, expectedExtension);
+    }
+
+    private void validateFormatFile(MultipartFile file, String formatLabel, String expectedExtension) {
+        if (file == null || file.isEmpty()) {
+            return;
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (!StringUtils.hasText(originalFilename)) {
+            throw new IllegalArgumentException(formatLabel + " file name is required");
+        }
+        if (!originalFilename.toLowerCase(Locale.ROOT).endsWith("." + expectedExtension)) {
+            throw new IllegalArgumentException(formatLabel + " file must be a ." + expectedExtension + " file");
+        }
+        if (!fileStorageService.isValidBookFile(file)) {
+            throw new IllegalArgumentException("Invalid file type for " + originalFilename);
+        }
+    }
+
+    private BookFormat getOrCreateFormat(Book book, String formatType) {
+        return book.getFormats().stream()
+                .filter(f -> f.getType().getName().equalsIgnoreCase(formatType))
+                .findFirst()
+                .orElseGet(() -> {
+                    BookFormat newFormat = new BookFormat();
+                    newFormat.setBook(book);
+                    newFormat.setType(getOrCreateBookType(formatType));
+                    book.getFormats().add(newFormat);
+                    return newFormat;
+                });
+    }
+
+    private void applyStoredFile(BookFormat target, StoredFile storedFile) {
+        target.setContentUrl(storedFile.objectKey());
+        target.setFileSizeKb(fileStorageService.calculateFileSizeKb(storedFile.sizeBytes()));
+        target.setTotalPages(storedFile.totalPages());
     }
 
     @Override
@@ -312,13 +303,13 @@ public class BookService implements IBookService {
         // Map formats
         List<BookResponse.FormatInfo> formats = book.getFormats().stream()
                 .map(format -> {
-                    String contentUrl = null;
+                    String downloadUrl = null;
                     if (StringUtils.hasText(format.getContentUrl())) {
                         try {
-                            contentUrl = fileStorageService.generatePresignedUrl(format.getContentUrl());
+                            downloadUrl = fileStorageService.generatePresignedUrl(format.getContentUrl());
                         } catch (Exception ex) {
                             log.warn("Failed to generate presigned URL for object {}: {}", format.getContentUrl(), ex.getMessage());
-                            contentUrl = format.getContentUrl();
+                            downloadUrl = format.getContentUrl();
                         }
                     }
                     return new BookResponse.FormatInfo(
@@ -326,7 +317,8 @@ public class BookService implements IBookService {
                             format.getType().getName(),
                             format.getTotalPages(),
                             format.getFileSizeKb(),
-                            contentUrl);
+                            downloadUrl,
+                            downloadUrl);
                 })
                 .collect(java.util.stream.Collectors.toList());
         response.setFormats(formats);
@@ -374,26 +366,6 @@ public class BookService implements IBookService {
             authors.add(author);
         }
         return authors;
-    }
-
-    private String detectFormatType(MultipartFile file) {
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.isEmpty()) {
-            throw new IllegalArgumentException("File name is empty");
-        }
-
-        String extension = "";
-        int lastDotIndex = originalFilename.lastIndexOf(".");
-        if (lastDotIndex > 0) {
-            extension = originalFilename.substring(lastDotIndex + 1).toLowerCase();
-        }
-
-        return switch (extension) {
-            case "pdf" -> "PDF";
-            case "docx" -> "DOCX";
-            case "doc" -> "DOC";
-            default -> throw new IllegalArgumentException("Unsupported file type. Only PDF, DOCX, and DOC are allowed");
-        };
     }
 
     private synchronized BookType getOrCreateBookType(String typeName) {

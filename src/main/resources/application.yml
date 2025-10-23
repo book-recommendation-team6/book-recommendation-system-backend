@@ -78,7 +78,7 @@ app:
 
 file:
   upload-dir: ${FILE_UPLOAD_DIR:${user.dir}/book-recommendation-uploads/books}
-  allowed-extensions: pdf,docx,doc
+  allowed-extensions: pdf,epub,docx,doc
   max-size-mb: 25
 
 cloudinary:
