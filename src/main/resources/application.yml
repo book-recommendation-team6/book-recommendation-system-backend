@@ -82,15 +82,15 @@ file:
   max-size-mb: 25
 
 cloudinary:
-  cloudName: ${CLOUDINARY_CLOUD_NAME}
-  apiKey: ${CLOUDINARY_API_KEY}
-  apiSecret: ${CLOUDINARY_API_SECRET}
+  cloudName: ${CLOUDINARY_CLOUD_NAME:dch0t5hrl}
+  apiKey: ${CLOUDINARY_API_KEY:341944214885853}
+  apiSecret: ${CLOUDINARY_API_SECRET:_wrN517kIuE2jb9pFtZlBw-raHk}
   apiSecure: ${CLOUDINARY_API_SECURE:true}
 
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
-  access-key: ${MINIO_ACCESS_KEY:admin}
-  secret-key: ${MINIO_SECRET_KEY:12345678}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
   bucket-name: ${MINIO_BUCKET_NAME:book-files}
   public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
   presigned-expiry-seconds: ${MINIO_PRESIGNED_EXPIRY_SECONDS:3600}

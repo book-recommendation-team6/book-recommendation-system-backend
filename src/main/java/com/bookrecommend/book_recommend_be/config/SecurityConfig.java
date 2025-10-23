@@ -77,6 +77,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, API + "/books/add").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, API + "/books/update/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, API + "/books/delete/**").hasAuthority("ADMIN")
+                        .requestMatchers(API + "/users/*/favorites/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
