@@ -10,6 +10,7 @@ import java.time.Instant;
 public class RatingResponse {
     Long id;
     Long userId;
+    String userName;
     Long bookId;
     Integer value;
     String comment;

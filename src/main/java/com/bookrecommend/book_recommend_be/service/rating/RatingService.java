@@ -25,7 +25,7 @@ public class RatingService implements IRatingService {
 
     @Override
     @Transactional
-    public RatingResponse rateBook(Long userId, Long bookId, RatingRequest request) {
+    public List<RatingResponse> rateBook(Long userId, Long bookId, RatingRequest request) {
         User user = getUserOrThrow(userId);
         Book book = getBookOrThrow(bookId);
 
@@ -42,8 +42,11 @@ public class RatingService implements IRatingService {
                         .comment(request.getComment())
                         .build());
 
-        Rating savedRating = ratingRepository.save(rating);
-        return mapToRatingResponse(savedRating);
+        ratingRepository.save(rating);
+
+        return ratingRepository.findAllByBookId(bookId).stream()
+                .map(this::mapToRatingResponse)
+                .toList();
     }
 
     @Override
@@ -79,14 +82,46 @@ public class RatingService implements IRatingService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<RatingResponse> getBookRatings(Long userId, Long bookId) {
+        // Kiểm tra sách tồn tại
+        if (!bookRepository.existsById(bookId)) {
+            throw new ResourceNotFoundException("Không tìm thấy sách với ID: " + bookId);
+        }
+
+        // Nếu userId = 0, lấy tất cả ratings của sách
+        if (userId == 0) {
+            return ratingRepository.findAllByBookId(bookId).stream()
+                    .map(this::mapToRatingResponse)
+                    .toList();
+        }
+
+        // Nếu userId != 0, lấy rating của user cụ thể
+        return ratingRepository.findByUserIdAndBookId(userId, bookId)
+                .map(rating -> List.of(mapToRatingResponse(rating)))
+                .orElse(List.of());
+    }
+
     private RatingResponse mapToRatingResponse(Rating rating) {
         return RatingResponse.builder()
                 .id(rating.getId())
                 .userId(rating.getUser().getId())
+                .userName(rating.getUser().getUsername())
                 .bookId(rating.getBook().getId())
                 .value(rating.getValue())
                 .comment(rating.getComment())
                 .createdAt(rating.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Double getAverageRatingByBookId(Long bookId) {
+        if (!bookRepository.existsById(bookId)) {
+            throw new ResourceNotFoundException("Không tìm thấy sách với ID: " + bookId);
+        }
+        Double average = ratingRepository.findAverageRatingByBookId(bookId);
+        return average != null ? Math.round(average * 10.0) / 10.0 : 0.0;
     }
 }
