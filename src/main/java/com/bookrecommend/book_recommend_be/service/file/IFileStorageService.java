@@ -12,4 +12,6 @@ public interface IFileStorageService {
     int calculateFileSizeKb(long sizeBytes);
 
     String generatePresignedUrl(String objectKey);
+
+    DownloadedFile getFile(String objectKey);
 }

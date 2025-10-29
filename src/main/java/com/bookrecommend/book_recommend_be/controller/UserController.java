@@ -1,5 +1,6 @@
 package com.bookrecommend.book_recommend_be.controller;
 
+import com.bookrecommend.book_recommend_be.dto.request.ChangePasswordRequest;
 import com.bookrecommend.book_recommend_be.dto.request.UpdateUserRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.UserResponse;
@@ -13,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,7 +49,14 @@ public class UserController {
     @PatchMapping("/users/{id}/unban")
     public ResponseEntity<ApiResponse<UserResponse>> unbanUser(@PathVariable Long id) {
         UserResponse response = userService.unbanUser(id);
-        return ResponseEntity.ok(ApiResponse.success(response, "User banned successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "User unbanned successfully"));
+    }
+
+    @PatchMapping("/users/{id}/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@PathVariable Long id,
+                                                            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(id, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully"));
     }
 
     @GetMapping("/users/profile")
@@ -66,8 +75,11 @@ public class UserController {
     @GetMapping("/admin/users")
     public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<UserResponse> users = userService.getAllUsers(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword) {
+        Page<UserResponse> users = StringUtils.hasText(keyword)
+                ? userService.searchUsers(keyword, page, size)
+                : userService.getAllUsers(page, size);
         return ResponseEntity.ok(ApiResponse.success(users, "Users retrieved successfully"));
     }
 }

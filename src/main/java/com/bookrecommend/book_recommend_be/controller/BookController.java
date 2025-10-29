@@ -3,17 +3,21 @@ package com.bookrecommend.book_recommend_be.controller;
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
+import com.bookrecommend.book_recommend_be.service.book.BookFileDownload;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.io.InputStream;
 
 @RestController
 @RequestMapping("${api.prefix}")
@@ -97,14 +101,23 @@ public class BookController {
     }
 
     @GetMapping("books/{bookId}/download/{formatId}")
-    public ResponseEntity<Void> downloadBookFile(
+    public ResponseEntity<StreamingResponseBody> downloadBookFile(
             @PathVariable Long bookId,
             @PathVariable Long formatId) {
 
-        String downloadUrl = bookService.getBookFormatUrl(bookId, formatId);
-        return ResponseEntity
-                .status(HttpStatus.FOUND)
-                .location(URI.create(downloadUrl))
-                .build();
+        BookFileDownload fileDownload = bookService.getBookFileForDownload(bookId, formatId);
+
+        InputStream inputStream = fileDownload.inputStream();
+        StreamingResponseBody body = outputStream -> {
+            try (InputStream in = inputStream) {
+                in.transferTo(outputStream);
+            }
+        };
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(fileDownload.resolvedContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileDownload.fileName() + "\"")
+                .contentLength(fileDownload.contentLength())
+                .body(body);
     }
 }

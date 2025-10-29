@@ -146,6 +146,36 @@ public class FileStorageService implements IFileStorageService {
         }
     }
 
+    @Override
+    public DownloadedFile getFile(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            throw new IllegalArgumentException("Object key must not be empty");
+        }
+
+        try {
+            StatObjectResponse stat = minioClient.statObject(StatObjectArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .object(objectKey)
+                    .build());
+
+            GetObjectResponse response = minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(minioProperties.getBucketName())
+                    .object(objectKey)
+                    .build());
+
+            long size = stat.size();
+            String contentType = stat.contentType();
+
+            return DownloadedFile.builder()
+                    .inputStream(response)
+                    .contentType(contentType)
+                    .sizeBytes(size)
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to download file from storage", e);
+        }
+    }
+
     private void ensureBucket() {
         try {
             boolean exists = minioClient.bucketExists(BucketExistsArgs.builder()

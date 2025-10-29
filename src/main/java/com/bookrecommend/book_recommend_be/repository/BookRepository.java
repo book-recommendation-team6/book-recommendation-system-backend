@@ -8,14 +8,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface BookRepository extends JpaRepository<Book, Long> {
-    @Query("SELECT b FROM Book b ORDER BY b.createdAt DESC")
+    Page<Book> findByIsDeletedFalse(Pageable pageable);
+
+    long countByIsDeletedFalse();
+
+    boolean existsByIdAndIsDeletedFalse(Long id);
+
+    Optional<Book> findByIdAndIsDeletedFalse(Long id);
+
+    @Query("""
+            SELECT b FROM Book b
+            WHERE b.isDeleted = false
+            ORDER BY b.createdAt DESC
+            """)
     Page<Book> findNewestBooks(Pageable pageable);
 
     @Query("""
             SELECT b FROM Book b
             LEFT JOIN b.readingHistories rh
+            WHERE b.isDeleted = false
             GROUP BY b
             ORDER BY COUNT(rh) DESC
             """)
@@ -25,6 +40,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
             SELECT b FROM Book b
             JOIN b.genres g
             WHERE g.id = :genreId
+              AND b.isDeleted = false
             ORDER BY b.createdAt DESC
             """)
     Page<Book> findBooksByGenre(Long genreId, Pageable pageable);
@@ -32,9 +48,12 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     @Query("""
             SELECT DISTINCT b FROM Book b
             LEFT JOIN b.authors a
-            WHERE LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(a.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(b.publisher) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            WHERE b.isDeleted = false
+              AND (
+                    LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(a.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(b.publisher) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
             ORDER BY b.createdAt DESC
             """)
     Page<Book> searchBooks(@Param("keyword") String keyword, Pageable pageable);
@@ -47,6 +66,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
                    COUNT(r) AS ratingCount
             FROM Book b
             LEFT JOIN b.ratings r
+            WHERE b.isDeleted = false
             GROUP BY b.id, b.title, b.coverImageUrl
             ORDER BY COALESCE(AVG(r.value), 0) DESC, COUNT(r) DESC
             """)
@@ -59,6 +79,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
                    COUNT(f) AS favoriteCount
             FROM Book b
             LEFT JOIN b.favorites f
+            WHERE b.isDeleted = false
             GROUP BY b.id, b.title, b.coverImageUrl
             ORDER BY COUNT(f) DESC, b.title ASC
             """)

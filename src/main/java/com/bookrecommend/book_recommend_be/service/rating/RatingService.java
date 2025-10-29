@@ -72,7 +72,7 @@ public class RatingService implements IRatingService {
     }
 
     private Book getBookOrThrow(Long bookId) {
-        return bookRepository.findById(bookId)
+        return bookRepository.findByIdAndIsDeletedFalse(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
     }
 
@@ -86,7 +86,7 @@ public class RatingService implements IRatingService {
     @Transactional(readOnly = true)
     public List<RatingResponse> getBookRatings(Long userId, Long bookId) {
         // Kiểm tra sách tồn tại
-        if (!bookRepository.existsById(bookId)) {
+        if (!bookRepository.existsByIdAndIsDeletedFalse(bookId)) {
             throw new ResourceNotFoundException("Không tìm thấy sách với ID: " + bookId);
         }
 
@@ -118,7 +118,7 @@ public class RatingService implements IRatingService {
     @Override
     @Transactional(readOnly = true)
     public Double getAverageRatingByBookId(Long bookId) {
-        if (!bookRepository.existsById(bookId)) {
+        if (!bookRepository.existsByIdAndIsDeletedFalse(bookId)) {
             throw new ResourceNotFoundException("Không tìm thấy sách với ID: " + bookId);
         }
         Double average = ratingRepository.findAverageRatingByBookId(bookId);

@@ -1,5 +1,6 @@
 package com.bookrecommend.book_recommend_be.dto.response;
 
+import com.bookrecommend.book_recommend_be.model.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,9 +18,8 @@ public class UserResponse {
     private String email;
     private String phoneNumber;
     private String avatarUrl;
-    private boolean activate;
     private String fullName;
-    private boolean ban;
+    private UserStatus status;
     private Instant createdAt;
     private Instant updatedAt;
     private String roleName;

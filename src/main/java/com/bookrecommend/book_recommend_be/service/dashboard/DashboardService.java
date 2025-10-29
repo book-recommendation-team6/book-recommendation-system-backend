@@ -34,7 +34,7 @@ public class DashboardService implements IDashboardService {
     public AdminDashboardResponse getDashboardData(int topRatedPage, int topRatedSize,
                                                    int topFavoritedPage, int topFavoritedSize) {
         long totalUsers = userRepository.count();
-        long totalBooks = bookRepository.count();
+        long totalBooks = bookRepository.countByIsDeletedFalse();
         long totalGenres = genreRepository.count();
         long totalAuthors = authorRepository.count();
 

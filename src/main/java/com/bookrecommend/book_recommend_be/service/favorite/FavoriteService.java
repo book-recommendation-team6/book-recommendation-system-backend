@@ -60,7 +60,7 @@ public class FavoriteService implements IFavoriteService {
     }
 
     private Book getBookOrThrow(Long bookId) {
-        return bookRepository.findById(bookId)
+        return bookRepository.findByIdAndIsDeletedFalse(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
     }
 
@@ -107,4 +107,3 @@ public class FavoriteService implements IFavoriteService {
                 .build();
     }
 }
-

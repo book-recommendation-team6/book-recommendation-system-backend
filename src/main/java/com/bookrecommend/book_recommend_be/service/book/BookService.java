@@ -10,6 +10,7 @@ import com.bookrecommend.book_recommend_be.repository.BookRepository;
 import com.bookrecommend.book_recommend_be.repository.BookTypeRepository;
 import com.bookrecommend.book_recommend_be.repository.GenreRepository;
 import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
+import com.bookrecommend.book_recommend_be.service.file.DownloadedFile;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
 import com.bookrecommend.book_recommend_be.service.file.StoredFile;
 import lombok.RequiredArgsConstructor;
@@ -22,11 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.text.Normalizer;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +40,7 @@ public class BookService implements IBookService {
     @Override
     public Page<BookResponse> getBooks(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return bookRepository.findAll(pageable)
+        return bookRepository.findByIsDeletedFalse(pageable)
                 .map(this::mapToBookResponse);
     }
 
@@ -85,8 +83,8 @@ public class BookService implements IBookService {
 
         log.info("Deleting book {} with {} files", id, fileUrls.size());
 
-        // Delete from database first (cascade will delete formats)
-        bookRepository.delete(book);
+        book.setDeleted(true);
+        bookRepository.save(book);
 
         // Then delete physical files
         fileUrls.forEach(url -> {
@@ -277,6 +275,29 @@ public class BookService implements IBookService {
         return fileStorageService.generatePresignedUrl(objectKey);
     }
 
+    @Override
+    public BookFileDownload getBookFileForDownload(Long bookId, Long formatId) {
+        Book book = findBookOrThrow(bookId);
+
+        BookFormat format = book.getFormats().stream()
+                .filter(f -> f.getId().equals(formatId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Format not found with id: " + formatId));
+
+        String objectKey = format.getContentUrl();
+
+        DownloadedFile file = fileStorageService.getFile(objectKey);
+
+        String fileName = buildDownloadFileName(book.getTitle(), format, objectKey);
+
+        return BookFileDownload.builder()
+                .inputStream(file.inputStream())
+                .fileName(fileName)
+                .contentType(file.resolvedContentType())
+                .contentLength(file.sizeBytes())
+                .build();
+    }
+
     private BookResponse mapToBookResponse(Book book) {
         BookResponse response = new BookResponse();
         response.setId(book.getId());
@@ -327,8 +348,46 @@ public class BookService implements IBookService {
     }
 
     private Book findBookOrThrow(Long id) {
-        return bookRepository.findById(id)
+        return bookRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + id));
+    }
+
+    private String buildDownloadFileName(String title, BookFormat format, String objectKey) {
+        String baseName = sanitizeFileName(title);
+        String extension = resolveFileExtension(format, objectKey);
+        return baseName + "." + extension;
+    }
+
+    private String resolveFileExtension(BookFormat format, String objectKey) {
+        String extensionFromKey = StringUtils.getFilenameExtension(objectKey);
+        if (StringUtils.hasText(extensionFromKey)) {
+            return extensionFromKey.toLowerCase(Locale.ROOT);
+        }
+        String typeName = Optional.ofNullable(format.getType())
+                .map(BookType::getName)
+                .orElse(null);
+        if (StringUtils.hasText(typeName)) {
+            return typeName.toLowerCase(Locale.ROOT);
+        }
+        return "bin";
+    }
+
+    private String sanitizeFileName(String title) {
+        if (!StringUtils.hasText(title)) {
+            return "book";
+        }
+        String normalized = Normalizer.normalize(title, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+
+        String sanitized = normalized
+                .replaceAll("[^\\w\\d-]+", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+
+        if (!StringUtils.hasText(sanitized)) {
+            return "book";
+        }
+        return sanitized.toLowerCase(Locale.ROOT);
     }
 
     private void validateBookInput(String title, String description, List<String> authorNames, List<Long> genreIds) {

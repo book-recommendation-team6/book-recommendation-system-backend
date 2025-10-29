@@ -1,9 +1,11 @@
 package com.bookrecommend.book_recommend_be.service.user;
 
+import com.bookrecommend.book_recommend_be.dto.request.ChangePasswordRequest;
 import com.bookrecommend.book_recommend_be.dto.request.UpdateUserRequest;
 import com.bookrecommend.book_recommend_be.dto.response.UserResponse;
 import com.bookrecommend.book_recommend_be.exceptions.ResourceNotFoundException;
 import com.bookrecommend.book_recommend_be.model.User;
+import com.bookrecommend.book_recommend_be.model.enums.UserStatus;
 import com.bookrecommend.book_recommend_be.repository.UserRepository;
 import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,6 +28,7 @@ public class UserService implements IUserService {
 
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -81,8 +87,20 @@ public class UserService implements IUserService {
     @Override
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        return userRepository.findAll(pageable)
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return userRepository.findNonAdminUsers(pageable)
+                .map(this::mapToResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserResponse> searchUsers(String keyword, int page, int size) {
+        if (!StringUtils.hasText(keyword)) {
+            return getAllUsers(page, size);
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return userRepository.searchUsers(keyword.trim(), pageable)
                 .map(this::mapToResponse);
     }
 
@@ -90,6 +108,9 @@ public class UserService implements IUserService {
     @Transactional
     public UserResponse banUser(Long userId) {
         User user = findUserOrThrow(userId);
+        if (user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+            throw new IllegalArgumentException("Cannot ban administrator accounts");
+        }
         user.setBan(true);
         User bannedUser = userRepository.save(user);
         return mapToResponse(bannedUser);
@@ -104,6 +125,23 @@ public class UserService implements IUserService {
         return mapToResponse(bannedUser);
     }
 
+    @Override
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = findUserOrThrow(userId);
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("New password must be different from current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
     private User findUserOrThrow(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
@@ -116,9 +154,8 @@ public class UserService implements IUserService {
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .avatarUrl(user.getAvatarUrl())
-                .activate(user.isActivate())
                 .fullName(user.getFullName())
-                .ban(user.isBan())
+                .status(UserStatus.fromUser(user))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .roleName(user.getRole() != null ? user.getRole().getName() : null)

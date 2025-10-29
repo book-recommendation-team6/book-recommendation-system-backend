@@ -47,6 +47,9 @@ public class Book {
     @Column(name = "publisher", length = 100)
     private String publisher;
 
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
