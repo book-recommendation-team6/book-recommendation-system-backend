@@ -29,7 +29,7 @@ public class ReadingHistory {
     private Book book;
 
     @CreationTimestamp
-    @Column(name = "last_read_at", nullable = false, updatable = false)
+    @Column(name = "last_read_at", nullable = false)
     private Instant lastReadAt;
 
     @Column(name = "progress")

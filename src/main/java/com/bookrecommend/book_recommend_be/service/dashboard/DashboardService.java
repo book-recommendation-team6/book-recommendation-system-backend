@@ -4,7 +4,9 @@ import com.bookrecommend.book_recommend_be.dto.response.AdminDashboardResponse;
 import com.bookrecommend.book_recommend_be.dto.response.dashboard.DailyUserRegistrationResponse;
 import com.bookrecommend.book_recommend_be.dto.response.dashboard.TopFavoritedBookResponse;
 import com.bookrecommend.book_recommend_be.dto.response.dashboard.TopRatedBookResponse;
+import com.bookrecommend.book_recommend_be.repository.AuthorRepository;
 import com.bookrecommend.book_recommend_be.repository.BookRepository;
+import com.bookrecommend.book_recommend_be.repository.GenreRepository;
 import com.bookrecommend.book_recommend_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,12 +27,16 @@ public class DashboardService implements IDashboardService {
 
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
+    private final GenreRepository genreRepository;
+    private final AuthorRepository authorRepository;
 
     @Override
     public AdminDashboardResponse getDashboardData(int topRatedPage, int topRatedSize,
                                                    int topFavoritedPage, int topFavoritedSize) {
         long totalUsers = userRepository.count();
-        long totalBooks = bookRepository.count();
+        long totalBooks = bookRepository.countByIsDeletedFalse();
+        long totalGenres = genreRepository.count();
+        long totalAuthors = authorRepository.count();
 
         List<DailyUserRegistrationResponse> newUsersLast7Days = buildNewUsersLast7Days();
 
@@ -45,6 +51,8 @@ public class DashboardService implements IDashboardService {
         return AdminDashboardResponse.builder()
                 .totalUsers(totalUsers)
                 .totalBooks(totalBooks)
+                .totalGenres(totalGenres)
+                .totalAuthors(totalAuthors)
                 .newUsersLast7Days(newUsersLast7Days)
                 .topRatedBooks(topRatedBooks)
                 .topFavoritedBooks(topFavoritedBooks)

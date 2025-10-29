@@ -48,7 +48,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -71,12 +71,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, API + "/books", API + "/books/newest", API + "/books/most-read",
                                 API + "/books/genre/**", API + "/books/search").permitAll()
                         .requestMatchers(HttpMethod.GET, API + "/books/{bookId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/ratings").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/average-rating").permitAll()
                         .requestMatchers(HttpMethod.GET, API + "/books/{bookId}/download/**").authenticated()
                         .requestMatchers(HttpMethod.POST, API + "/books/create-with-files").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, API + "/books/update-with-files/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, API + "/books/add").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, API + "/books/update/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, API + "/books/delete/**").hasAuthority("ADMIN")
+                        .requestMatchers(API + "/users/*/favorites/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/users/*/books/*/ratings").permitAll()
+                        .requestMatchers(HttpMethod.GET, API + "/users/*/books/*/average-rating").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo

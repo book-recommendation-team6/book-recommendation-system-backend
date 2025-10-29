@@ -49,5 +49,6 @@ public class BookResponse {
         Integer totalPages;
         Integer fileSizeKb;
         String contentUrl;
+        String downloadUrl;
     }
 }

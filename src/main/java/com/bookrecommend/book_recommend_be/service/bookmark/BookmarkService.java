@@ -70,7 +70,7 @@ public class BookmarkService implements IBookmarkService {
     }
 
     private Book getBookOrThrow(Long bookId) {
-        return bookRepository.findById(bookId)
+        return bookRepository.findByIdAndIsDeletedFalse(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
     }
 
@@ -81,7 +81,7 @@ public class BookmarkService implements IBookmarkService {
     }
 
     private void ensureBookExists(Long bookId) {
-        if (!bookRepository.existsById(bookId)) {
+        if (!bookRepository.existsByIdAndIsDeletedFalse(bookId)) {
             throw new ResourceNotFoundException("Book not found with id: " + bookId);
         }
     }

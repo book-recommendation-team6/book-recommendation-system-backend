@@ -6,10 +6,9 @@ import com.bookrecommend.book_recommend_be.dto.response.ReadingHistoryResponse;
 import com.bookrecommend.book_recommend_be.service.history.IReadingHistoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("${api.prefix}/users/{userId}")
@@ -27,8 +26,10 @@ public class ReadingHistoryController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<ApiResponse<List<ReadingHistoryResponse>>> getUserHistory(@PathVariable Long userId) {
-        List<ReadingHistoryResponse> history = readingHistoryService.getUserReadingHistory(userId);
+    public ResponseEntity<ApiResponse<Page<ReadingHistoryResponse>>> getUserHistory(@PathVariable Long userId,
+                                                                                    @RequestParam(defaultValue = "0") int page,
+                                                                                    @RequestParam(defaultValue = "10") int size) {
+        Page<ReadingHistoryResponse> history = readingHistoryService.getUserReadingHistory(userId, page, size);
         return ResponseEntity.ok(ApiResponse.success(history, "Reading history fetched successfully"));
     }
 }

@@ -7,9 +7,13 @@ import java.util.List;
 
 public interface IRatingService {
 
-    RatingResponse rateBook(Long userId, Long bookId, RatingRequest request);
+    List<RatingResponse> rateBook(Long userId, Long bookId, RatingRequest request);
 
     void deleteRating(Long userId, Long bookId);
 
     List<RatingResponse> getUserRatings(Long userId);
+
+    List<RatingResponse> getBookRatings(Long userId, Long bookId);
+
+    Double getAverageRatingByBookId(Long bookId);
 }

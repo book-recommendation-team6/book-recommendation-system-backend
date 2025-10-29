@@ -3,6 +3,7 @@ package com.bookrecommend.book_recommend_be.service.history;
 import com.bookrecommend.book_recommend_be.dto.request.ReadingHistoryRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ReadingHistoryResponse;
 import com.bookrecommend.book_recommend_be.exceptions.ResourceNotFoundException;
+import com.bookrecommend.book_recommend_be.model.Author;
 import com.bookrecommend.book_recommend_be.model.Book;
 import com.bookrecommend.book_recommend_be.model.ReadingHistory;
 import com.bookrecommend.book_recommend_be.model.User;
@@ -10,11 +11,16 @@ import com.bookrecommend.book_recommend_be.repository.BookRepository;
 import com.bookrecommend.book_recommend_be.repository.ReadingHistoryRepository;
 import com.bookrecommend.book_recommend_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,17 +37,13 @@ public class ReadingHistoryService implements IReadingHistoryService {
         Book book = getBookOrThrow(bookId);
 
         ReadingHistory history = readingHistoryRepository.findByUserIdAndBookId(userId, bookId)
-                .map(existing -> {
-                    existing.setProgress(request.getProgress());
-                    existing.setLastReadAt(Instant.now());
-                    return existing;
-                })
                 .orElseGet(() -> ReadingHistory.builder()
                         .user(user)
                         .book(book)
-                        .progress(request.getProgress())
-                        .lastReadAt(Instant.now())
                         .build());
+
+        history.setProgress(request.getProgress());
+        history.setLastReadAt(Instant.now());
 
         ReadingHistory savedHistory = readingHistoryRepository.save(history);
         return mapToReadingHistoryResponse(savedHistory);
@@ -49,11 +51,11 @@ public class ReadingHistoryService implements IReadingHistoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReadingHistoryResponse> getUserReadingHistory(Long userId) {
+    public Page<ReadingHistoryResponse> getUserReadingHistory(Long userId, int page, int size) {
         ensureUserExists(userId);
-        return readingHistoryRepository.findAllByUserIdOrderByLastReadAtDesc(userId).stream()
-                .map(this::mapToReadingHistoryResponse)
-                .toList();
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "lastReadAt"));
+        return readingHistoryRepository.findAllByUserId(userId, pageable)
+                .map(this::mapToReadingHistoryResponse);
     }
 
     private User getUserOrThrow(Long userId) {
@@ -62,7 +64,7 @@ public class ReadingHistoryService implements IReadingHistoryService {
     }
 
     private Book getBookOrThrow(Long bookId) {
-        return bookRepository.findById(bookId)
+        return bookRepository.findByIdAndIsDeletedFalse(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
     }
 
@@ -73,12 +75,30 @@ public class ReadingHistoryService implements IReadingHistoryService {
     }
 
     private ReadingHistoryResponse mapToReadingHistoryResponse(ReadingHistory history) {
+        Book book = history.getBook();
+        List<ReadingHistoryResponse.AuthorSummary> authors = book.getAuthors().stream()
+                .map(this::mapToAuthorSummary)
+                .collect(Collectors.toList());
+
         return ReadingHistoryResponse.builder()
                 .id(history.getId())
                 .userId(history.getUser().getId())
-                .bookId(history.getBook().getId())
+                .bookId(book.getId())
                 .progress(history.getProgress())
                 .lastReadAt(history.getLastReadAt())
+                .book(ReadingHistoryResponse.BookSummary.builder()
+                        .id(book.getId())
+                        .title(book.getTitle())
+                        .coverImageUrl(book.getCoverImageUrl())
+                        .authors(authors)
+                        .build())
+                .build();
+    }
+
+    private ReadingHistoryResponse.AuthorSummary mapToAuthorSummary(Author author) {
+        return ReadingHistoryResponse.AuthorSummary.builder()
+                .id(author.getId())
+                .name(author.getName())
                 .build();
     }
 }

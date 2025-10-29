@@ -60,7 +60,7 @@ public class FavoriteService implements IFavoriteService {
     }
 
     private Book getBookOrThrow(Long bookId) {
-        return bookRepository.findById(bookId)
+        return bookRepository.findByIdAndIsDeletedFalse(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
     }
 
@@ -71,11 +71,39 @@ public class FavoriteService implements IFavoriteService {
     }
 
     private FavoriteResponse mapToFavoriteResponse(Favorite favorite) {
+        Book book = favorite.getBook();
+
         return FavoriteResponse.builder()
                 .id(favorite.getId())
                 .userId(favorite.getUser().getId())
-                .bookId(favorite.getBook().getId())
+                .bookId(book.getId())
                 .addedAt(favorite.getAddedAt())
+                .book(mapToBookInfo(book))
+                .build();
+    }
+
+    private FavoriteResponse.BookInfo mapToBookInfo(Book book) {
+        return FavoriteResponse.BookInfo.builder()
+                .id(book.getId())
+                .title(book.getTitle())
+                .description(book.getDescription())
+                .coverImageUrl(book.getCoverImageUrl())
+                .publicationYear(book.getPublicationYear())
+                .publisher(book.getPublisher())
+                .authors(book.getAuthors().stream()
+                        .map(author -> new FavoriteResponse.AuthorInfo(author.getId(), author.getName()))
+                        .collect(java.util.stream.Collectors.toSet()))
+                .genres(book.getGenres().stream()
+                        .map(genre -> new FavoriteResponse.GenreInfo(genre.getId(), genre.getName()))
+                        .collect(java.util.stream.Collectors.toSet()))
+                .formats(book.getFormats().stream()
+                        .map(format -> new FavoriteResponse.FormatInfo(
+                                format.getId(),
+                                format.getType().getName(),
+                                format.getTotalPages(),
+                                format.getFileSizeKb(),
+                                format.getContentUrl()))
+                        .collect(java.util.stream.Collectors.toList()))
                 .build();
     }
 }

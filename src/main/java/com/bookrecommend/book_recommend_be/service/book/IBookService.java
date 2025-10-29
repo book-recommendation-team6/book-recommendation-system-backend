@@ -25,4 +25,5 @@ public interface IBookService {
 
     String getBookFormatUrl(Long bookId, Long formatId);
 
+    BookFileDownload getBookFileForDownload(Long bookId, Long formatId);
 }

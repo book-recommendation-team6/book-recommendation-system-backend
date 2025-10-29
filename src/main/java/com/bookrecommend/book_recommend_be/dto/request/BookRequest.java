@@ -29,5 +29,6 @@ public class BookRequest {
     private List<Long> genreIds;
 
     private MultipartFile cover;
-    private MultipartFile file;
+    private MultipartFile pdfFile;
+    private MultipartFile epubFile;
 }

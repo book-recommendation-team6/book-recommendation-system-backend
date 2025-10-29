@@ -18,6 +18,8 @@ import java.util.List;
 public class AdminDashboardResponse {
     private long totalUsers;
     private long totalBooks;
+    private long totalGenres;
+    private long totalAuthors;
     private List<DailyUserRegistrationResponse> newUsersLast7Days;
     private Page<TopRatedBookResponse> topRatedBooks;
     private Page<TopFavoritedBookResponse> topFavoritedBooks;
