@@ -9,6 +9,8 @@ public interface IBookmarkService {
 
     BookmarkResponse createBookmark(Long userId, Long bookId, BookmarkRequest request);
 
+    BookmarkResponse updateBookmark(Long userId, Long bookmarkId, BookmarkRequest request);
+
     void deleteBookmark(Long userId, Long bookmarkId);
 
     List<BookmarkResponse> getBookmarksForBook(Long userId, Long bookId);

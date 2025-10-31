@@ -14,12 +14,19 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.persistence.criteria.Predicate;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -86,34 +93,179 @@ public class UserService implements IUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return userRepository.findNonAdminUsers(pageable)
+    public Page<UserResponse> getUsers(int page, int size, String keyword, String status, String sortOption) {
+        Sort sort = resolveSort(sortOption);
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Specification<User> specification = buildSpecification(keyword, status);
+        return userRepository.findAll(specification, pageable)
                 .map(this::mapToResponse);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<UserResponse> searchUsers(String keyword, int page, int size) {
-        if (!StringUtils.hasText(keyword)) {
-            return getAllUsers(page, size);
+    private Specification<User> buildSpecification(String keyword, String status) {
+        Specification<User> spec = nonAdminSpecification();
+
+        if (StringUtils.hasText(keyword)) {
+            spec = spec.and(keywordSpecification(keyword.trim()));
         }
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return userRepository.searchUsers(keyword.trim(), pageable)
-                .map(this::mapToResponse);
+        Specification<User> statusSpec = statusSpecification(status);
+        if (statusSpec != null) {
+            spec = spec.and(statusSpec);
+        }
+
+        return spec;
+    }
+
+    private Specification<User> nonAdminSpecification() {
+        return (root, query, cb) -> cb.notEqual(cb.upper(root.join("role").get("name")), "ADMIN");
+    }
+
+    private Specification<User> keywordSpecification(String keyword) {
+        String trimmed = keyword.trim();
+        String normalized = trimmed.toLowerCase(Locale.ROOT);
+        String likePattern = "%" + normalized + "%";
+
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.like(cb.lower(root.get("username")), likePattern));
+            predicates.add(cb.like(cb.lower(root.get("email")), likePattern));
+            predicates.add(cb.like(cb.lower(root.get("fullName")), likePattern));
+            predicates.add(cb.like(cb.lower(root.get("phoneNumber")), likePattern));
+
+            if (isNumeric(trimmed)) {
+                try {
+                    Long id = Long.parseLong(trimmed);
+                    predicates.add(cb.equal(root.get("id"), id));
+                } catch (NumberFormatException ex) {
+                    log.debug("Failed to parse keyword '{}' as user id", trimmed, ex);
+                }
+            }
+
+            return cb.or(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Specification<User> statusSpecification(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+
+        try {
+            UserStatus resolvedStatus = UserStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+            return switch (resolvedStatus) {
+                case BANNED -> (root, query, cb) -> cb.isTrue(root.get("ban"));
+                case ACTIVE -> (root, query, cb) -> cb.and(
+                        cb.isFalse(root.get("ban")),
+                        cb.isTrue(root.get("activate"))
+                );
+                case INACTIVE -> (root, query, cb) -> cb.and(
+                        cb.isFalse(root.get("ban")),
+                        cb.isFalse(root.get("activate"))
+                );
+            };
+        } catch (IllegalArgumentException ex) {
+            log.warn("Unknown status filter provided: {}", status);
+            return null;
+        }
+    }
+
+    private Sort resolveSort(String sortOption) {
+        String normalized = StringUtils.hasText(sortOption)
+                ? sortOption.trim().toLowerCase(Locale.ROOT)
+                : "newest";
+
+        return switch (normalized) {
+            case "oldest" -> Sort.by(Sort.Direction.ASC, "createdAt");
+            case "name-asc" -> Sort.by(Sort.Direction.ASC, "username").and(Sort.by(Sort.Direction.DESC, "createdAt"));
+            case "name-desc" -> Sort.by(Sort.Direction.DESC, "username").and(Sort.by(Sort.Direction.DESC, "createdAt"));
+            case "email-asc" -> Sort.by(Sort.Direction.ASC, "email").and(Sort.by(Sort.Direction.DESC, "createdAt"));
+            case "email-desc" -> Sort.by(Sort.Direction.DESC, "email").and(Sort.by(Sort.Direction.DESC, "createdAt"));
+            case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default -> {
+                log.warn("Unknown sort option provided: {}. Falling back to newest first.", sortOption);
+                yield Sort.by(Sort.Direction.DESC, "createdAt");
+            }
+        };
+    }
+
+    private boolean isNumeric(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
     @Transactional
     public UserResponse banUser(Long userId) {
-        User user = findUserOrThrow(userId);
-        if (user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName())) {
-            throw new IllegalArgumentException("Cannot ban administrator accounts");
+        List<UserResponse> responses = banUsers(java.util.Collections.singletonList(userId));
+        if (responses.isEmpty()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
         }
-        user.setBan(true);
-        User bannedUser = userRepository.save(user);
-        return mapToResponse(bannedUser);
+        return responses.get(0);
+    }
+
+    @Override
+    @Transactional
+    public List<UserResponse> banUsers(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one user id is required");
+        }
+
+        java.util.LinkedHashSet<Long> normalizedSet = new java.util.LinkedHashSet<>();
+        for (Long id : userIds) {
+            if (id != null) {
+                normalizedSet.add(id);
+            }
+        }
+
+        if (normalizedSet.isEmpty()) {
+            throw new IllegalArgumentException("At least one valid user id is required");
+        }
+
+        List<Long> normalizedIds = new ArrayList<>(normalizedSet);
+        List<User> users = userRepository.findAllById(normalizedIds);
+
+        java.util.Map<Long, User> usersById = new java.util.LinkedHashMap<>();
+        for (User user : users) {
+            usersById.putIfAbsent(user.getId(), user);
+        }
+
+        List<Long> missingIds = new ArrayList<>();
+        for (Long id : normalizedIds) {
+            if (!usersById.containsKey(id)) {
+                missingIds.add(id);
+            }
+        }
+
+        if (!missingIds.isEmpty()) {
+            throw new ResourceNotFoundException("Users not found with ids: " + missingIds);
+        }
+
+        List<Long> adminIds = new ArrayList<>();
+        usersById.values().forEach(user -> {
+            if (user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+                adminIds.add(user.getId());
+            }
+        });
+
+        if (!adminIds.isEmpty()) {
+            throw new IllegalArgumentException("Cannot ban administrator accounts: " + adminIds);
+        }
+
+        usersById.values().forEach(user -> user.setBan(true));
+        userRepository.saveAll(usersById.values());
+
+        List<UserResponse> responses = new ArrayList<>();
+        for (Long id : normalizedIds) {
+            responses.add(mapToResponse(usersById.get(id)));
+        }
+        return responses;
     }
 
     @Override

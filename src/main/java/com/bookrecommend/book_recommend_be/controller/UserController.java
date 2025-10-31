@@ -1,5 +1,6 @@
 package com.bookrecommend.book_recommend_be.controller;
 
+import com.bookrecommend.book_recommend_be.dto.request.BulkIdsRequest;
 import com.bookrecommend.book_recommend_be.dto.request.ChangePasswordRequest;
 import com.bookrecommend.book_recommend_be.dto.request.UpdateUserRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
@@ -14,9 +15,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("${api.prefix}")
@@ -44,6 +46,15 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> banUser(@PathVariable Long id) {
         UserResponse response = userService.banUser(id);
         return ResponseEntity.ok(ApiResponse.success(response, "User banned successfully"));
+    }
+
+    @PatchMapping("/users/ban")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> banUsers(
+            @Valid @RequestBody BulkIdsRequest request) {
+        int bannedCount = userService.banUsers(request.getIds()).size();
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("bannedCount", bannedCount),
+                "Users banned successfully"));
     }
 
     @PatchMapping("/users/{id}/unban")
@@ -76,10 +87,10 @@ public class UserController {
     public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
-        Page<UserResponse> users = StringUtils.hasText(keyword)
-                ? userService.searchUsers(keyword, page, size)
-                : userService.getAllUsers(page, size);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, name = "sort") String sortOption) {
+        Page<UserResponse> users = userService.getUsers(page, size, keyword, status, sortOption);
         return ResponseEntity.ok(ApiResponse.success(users, "Users retrieved successfully"));
     }
 }

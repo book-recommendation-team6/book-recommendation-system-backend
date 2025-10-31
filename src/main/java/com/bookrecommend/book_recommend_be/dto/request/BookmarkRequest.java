@@ -15,4 +15,7 @@ public class BookmarkRequest {
 
     @Size(max = 255)
     private String locationInBook;
+
+    @Size(max = 255)
+    private String note;
 }

@@ -21,8 +21,10 @@ public class GenreController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<GenreResponse>>> getGenres(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<GenreResponse> genres = genreService.getGenres(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, name = "sort") String sortOption) {
+        Page<GenreResponse> genres = genreService.getGenres(page, size, keyword, sortOption);
         return ResponseEntity.ok(ApiResponse.success(genres, "Genres retrieved successfully"));
     }
 }
