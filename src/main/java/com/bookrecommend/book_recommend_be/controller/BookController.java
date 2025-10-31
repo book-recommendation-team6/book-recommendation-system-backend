@@ -1,6 +1,7 @@
 package com.bookrecommend.book_recommend_be.controller;
 
 import com.bookrecommend.book_recommend_be.dto.request.BookRequest;
+import com.bookrecommend.book_recommend_be.dto.request.BulkIdsRequest;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.service.book.BookFileDownload;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.net.URI;
+import java.util.Map;
 import java.io.InputStream;
 
 @RestController
@@ -54,9 +55,21 @@ public class BookController {
     public ResponseEntity<ApiResponse<Page<BookResponse>>> getBooksByGenre(
             @PathVariable Long genreId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<BookResponse> books = bookService.getBooksByGenre(genreId, page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false, name = "sort") String sortOption) {
+        Page<BookResponse> books = bookService.getBooksByGenre(genreId, page, size, sortOption);
         return ResponseEntity.ok(ApiResponse.success(books, "Books by genre retrieved successfully"));
+    }
+
+    @GetMapping("admin/books")
+    public ResponseEntity<ApiResponse<Page<BookResponse>>> getAdminBooks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long genreId,
+            @RequestParam(required = false, name = "sort") String sortOption) {
+        Page<BookResponse> books = bookService.getAdminBooks(page, size, keyword, genreId, sortOption);
+        return ResponseEntity.ok(ApiResponse.success(books, "Books retrieved successfully"));
     }
 
     @GetMapping("books/search")
@@ -98,6 +111,15 @@ public class BookController {
     public ResponseEntity<ApiResponse<Void>> deleteBook(@PathVariable Long id) {
         bookService.deleteBook(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Book deleted successfully"));
+    }
+
+    @DeleteMapping("admin/books")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteBooks(
+            @Valid @RequestBody BulkIdsRequest request) {
+        int deletedCount = bookService.deleteBooks(request.getIds());
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("deletedCount", deletedCount),
+                "Books deleted successfully"));
     }
 
     @GetMapping("books/{bookId}/download/{formatId}")

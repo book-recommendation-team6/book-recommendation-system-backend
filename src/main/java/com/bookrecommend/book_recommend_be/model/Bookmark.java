@@ -13,8 +13,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "bookmarks",
-        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "book_id"})})
+@Table(name = "bookmarks")
 public class Bookmark {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,6 +34,10 @@ public class Bookmark {
     @Size(max = 255)
     @Column(name = "location_in_book", length = 255)
     private String locationInBook;
+
+    @Size(max = 255)
+    @Column(name = "note", length = 255)
+    private String note;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

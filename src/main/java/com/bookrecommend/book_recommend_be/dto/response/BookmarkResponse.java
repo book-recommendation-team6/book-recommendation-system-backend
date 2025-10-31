@@ -13,5 +13,6 @@ public class BookmarkResponse {
     Long bookId;
     Integer pageNumber;
     String locationInBook;
+    String note;
     Instant createdAt;
 }

@@ -27,6 +27,15 @@ public class BookmarkController {
         return ResponseEntity.ok(ApiResponse.success(response, "Bookmark created successfully"));
     }
 
+    @PutMapping("/bookmarks/{bookmarkId}")
+    public ResponseEntity<ApiResponse<BookmarkResponse>> updateBookmark(
+            @PathVariable Long userId,
+            @PathVariable Long bookmarkId,
+            @Valid @RequestBody BookmarkRequest request) {
+        BookmarkResponse response = bookmarkService.updateBookmark(userId, bookmarkId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Bookmark updated successfully"));
+    }
+
     @DeleteMapping("/bookmarks/{bookmarkId}")
     public ResponseEntity<ApiResponse<Void>> removeBookmark(
             @PathVariable Long userId,

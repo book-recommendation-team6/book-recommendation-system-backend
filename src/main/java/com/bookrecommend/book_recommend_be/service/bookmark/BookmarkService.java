@@ -34,6 +34,7 @@ public class BookmarkService implements IBookmarkService {
                 .book(book)
                 .pageNumber(request.getPageNumber())
                 .locationInBook(request.getLocationInBook())
+                .note(request.getNote())
                 .build();
 
         Bookmark saved = bookmarkRepository.save(bookmark);
@@ -42,14 +43,26 @@ public class BookmarkService implements IBookmarkService {
 
     @Override
     @Transactional
-    public void deleteBookmark(Long userId, Long bookmarkId) {
-        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bookmark not found with id: " + bookmarkId));
-
-        if (!bookmark.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Bookmark does not belong to user: " + userId);
+    public BookmarkResponse updateBookmark(Long userId, Long bookmarkId, BookmarkRequest request) {
+        Bookmark bookmark = getBookmarkForUserOrThrow(userId, bookmarkId);
+        if (request.getPageNumber() != null) {
+            bookmark.setPageNumber(request.getPageNumber());
+        }
+        if (request.getLocationInBook() != null) {
+            bookmark.setLocationInBook(request.getLocationInBook());
+        }
+        if (request.getNote() != null) {
+            bookmark.setNote(request.getNote());
         }
 
+        Bookmark saved = bookmarkRepository.save(bookmark);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteBookmark(Long userId, Long bookmarkId) {
+        Bookmark bookmark = getBookmarkForUserOrThrow(userId, bookmarkId);
         bookmarkRepository.delete(bookmark);
     }
 
@@ -86,6 +99,15 @@ public class BookmarkService implements IBookmarkService {
         }
     }
 
+    private Bookmark getBookmarkForUserOrThrow(Long userId, Long bookmarkId) {
+        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bookmark not found with id: " + bookmarkId));
+        if (!bookmark.getUser().getId().equals(userId)) {
+            throw new ResourceNotFoundException("Bookmark does not belong to user: " + userId);
+        }
+        return bookmark;
+    }
+
     private BookmarkResponse mapToResponse(Bookmark bookmark) {
         return BookmarkResponse.builder()
                 .id(bookmark.getId())
@@ -93,6 +115,7 @@ public class BookmarkService implements IBookmarkService {
                 .bookId(bookmark.getBook().getId())
                 .pageNumber(bookmark.getPageNumber())
                 .locationInBook(bookmark.getLocationInBook())
+                .note(bookmark.getNote())
                 .createdAt(bookmark.getCreatedAt())
                 .build();
     }

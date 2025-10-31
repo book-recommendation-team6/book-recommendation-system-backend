@@ -13,11 +13,15 @@ import com.bookrecommend.book_recommend_be.service.file.CloudinaryService;
 import com.bookrecommend.book_recommend_be.service.file.DownloadedFile;
 import com.bookrecommend.book_recommend_be.service.file.IFileStorageService;
 import com.bookrecommend.book_recommend_be.service.file.StoredFile;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -37,6 +41,7 @@ public class BookService implements IBookService {
     private final BookTypeRepository bookTypeRepository;
     private final IFileStorageService fileStorageService;
     private final CloudinaryService cloudinaryService;
+
     @Override
     public Page<BookResponse> getBooks(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -59,9 +64,30 @@ public class BookService implements IBookService {
     }
 
     @Override
-    public Page<BookResponse> getBooksByGenre(Long genreId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+    public Page<BookResponse> getBooksByGenre(Long genreId, int page, int size, String sortOption) {
+        String normalizedSort = StringUtils.hasText(sortOption)
+                ? sortOption.trim().toLowerCase(Locale.ROOT)
+                : "newest";
+
+        if ("popular".equals(normalizedSort)) {
+            Pageable pageable = PageRequest.of(page, size);
+            return bookRepository.findBooksByGenreOrderByPopularity(genreId, pageable)
+                    .map(this::mapToBookResponse);
+        }
+
+        Sort sort = resolveGenreSort(normalizedSort);
+        Pageable pageable = PageRequest.of(page, size, sort);
         return bookRepository.findBooksByGenre(genreId, pageable)
+                .map(this::mapToBookResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookResponse> getAdminBooks(int page, int size, String keyword, Long genreId, String sortOption) {
+        Sort sort = resolveAdminSort(sortOption);
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Specification<Book> specification = buildAdminSpecification(keyword, genreId);
+        return bookRepository.findAll(specification, pageable)
                 .map(this::mapToBookResponse);
     }
 
@@ -73,20 +99,49 @@ public class BookService implements IBookService {
 
     @Override
     @Transactional
-    public void deleteBook(Long id) {
-        Book book = findBookOrThrow(id);
-
-        // Delete physical files before deleting from database
-        List<String> fileUrls = book.getFormats().stream()
-                .map(BookFormat::getContentUrl)
+    public int deleteBooks(List<Long> ids) {
+        List<Long> normalizedIds = ids == null
+                ? java.util.Collections.emptyList()
+                : ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
                 .toList();
 
-        log.info("Deleting book {} with {} files", id, fileUrls.size());
+        if (normalizedIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one book id is required");
+        }
 
-        book.setDeleted(true);
-        bookRepository.save(book);
+        List<Book> books = bookRepository.findAllById(normalizedIds);
 
-        // Then delete physical files
+        java.util.Map<Long, Book> booksById = books.stream()
+                .filter(book -> !book.isDeleted())
+                .collect(java.util.stream.Collectors.toMap(
+                        Book::getId,
+                        book -> book,
+                        (existing, ignore) -> existing,
+                        java.util.LinkedHashMap::new
+                ));
+
+        List<Long> missing = normalizedIds.stream()
+                .filter(id -> !booksById.containsKey(id))
+                .toList();
+
+        if (!missing.isEmpty()) {
+            throw new ResourceNotFoundException("Books not found or already deleted: " + missing);
+        }
+
+        List<String> fileUrls = new ArrayList<>();
+        booksById.values().forEach(book -> {
+            book.setDeleted(true);
+            book.getFormats().stream()
+                    .map(BookFormat::getContentUrl)
+                    .filter(StringUtils::hasText)
+                    .forEach(fileUrls::add);
+        });
+
+        bookRepository.saveAll(booksById.values());
+        log.info("Deleting {} books", booksById.size());
+
         fileUrls.forEach(url -> {
             try {
                 fileStorageService.deleteFile(url);
@@ -95,7 +150,13 @@ public class BookService implements IBookService {
             }
         });
 
-        log.info("Book {} deleted successfully", id);
+        return booksById.size();
+    }
+
+    @Override
+    @Transactional
+    public void deleteBook(Long id) {
+        deleteBooks(java.util.Collections.singletonList(id));
     }
 
     @Override
@@ -296,6 +357,87 @@ public class BookService implements IBookService {
                 .contentType(file.resolvedContentType())
                 .contentLength(file.sizeBytes())
                 .build();
+    }
+
+    private Specification<Book> buildAdminSpecification(String keyword, Long genreId) {
+        Specification<Book> specification = notDeletedSpecification();
+
+        if (StringUtils.hasText(keyword)) {
+            specification = specification.and(keywordSpecification(keyword.trim()));
+        }
+
+        if (genreId != null) {
+            specification = specification.and(genreSpecification(genreId));
+        }
+
+        return specification;
+    }
+
+    private Specification<Book> notDeletedSpecification() {
+        return (root, query, cb) -> cb.isFalse(root.get("isDeleted"));
+    }
+
+    private Specification<Book> keywordSpecification(String keyword) {
+        String normalized = keyword.toLowerCase(Locale.ROOT);
+        String likePattern = "%" + normalized + "%";
+
+        return (root, query, cb) -> {
+            query.distinct(true);
+            Join<Book, Author> authorJoin = root.join("authors", JoinType.LEFT);
+            return cb.or(
+                    cb.like(cb.lower(root.get("title")), likePattern),
+                    cb.like(cb.lower(root.get("publisher")), likePattern),
+                    cb.like(cb.lower(authorJoin.get("name")), likePattern)
+            );
+        };
+    }
+
+    private Specification<Book> genreSpecification(Long genreId) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            Join<Book, Genre> genreJoin = root.join("genres", JoinType.INNER);
+            return cb.equal(genreJoin.get("id"), genreId);
+        };
+    }
+
+    private Sort resolveGenreSort(String sortOption) {
+        return switch (sortOption) {
+            case "oldest" -> Sort.by(
+                    Sort.Order.asc("publicationYear"),
+                    Sort.Order.asc("createdAt"));
+            case "title-asc", "title" -> Sort.by(
+                    Sort.Order.asc("title").ignoreCase(),
+                    Sort.Order.desc("createdAt"));
+            case "title-desc" -> Sort.by(
+                    Sort.Order.desc("title").ignoreCase(),
+                    Sort.Order.desc("createdAt"));
+            case "newest" -> Sort.by(
+                    Sort.Order.desc("publicationYear"),
+                    Sort.Order.desc("createdAt"));
+            default -> Sort.by(Sort.Order.desc("createdAt"));
+        };
+    }
+
+    private Sort resolveAdminSort(String sortOption) {
+        String normalized = StringUtils.hasText(sortOption)
+                ? sortOption.trim().toLowerCase(Locale.ROOT)
+                : "newest";
+
+        return switch (normalized) {
+            case "oldest" -> Sort.by(
+                    Sort.Order.asc("publicationYear"),
+                    Sort.Order.asc("createdAt"));
+            case "title-asc" -> Sort.by(
+                    Sort.Order.asc("title").ignoreCase(),
+                    Sort.Order.desc("createdAt"));
+            case "title-desc" -> Sort.by(
+                    Sort.Order.desc("title").ignoreCase(),
+                    Sort.Order.desc("createdAt"));
+            case "newest" -> Sort.by(
+                    Sort.Order.desc("publicationYear"),
+                    Sort.Order.desc("createdAt"));
+            default -> Sort.by(Sort.Order.desc("createdAt"));
+        };
     }
 
     private BookResponse mapToBookResponse(Book book) {
