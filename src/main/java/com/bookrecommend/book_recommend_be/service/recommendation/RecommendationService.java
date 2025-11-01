@@ -2,6 +2,7 @@ package com.bookrecommend.book_recommend_be.service.recommendation;
 
 import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationItem;
 import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationsResponse;
+import com.bookrecommend.book_recommend_be.dto.recommendation.SimilarBooksResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
 import lombok.RequiredArgsConstructor;
@@ -51,4 +52,34 @@ public class RecommendationService {
             return Collections.emptyList();
         }
     }
+
+    public List<BookResponse> getSimilarBooks(Long bookId, int limit) {
+        try {
+            String url = String.format("%s/similar?book_id=%d&limit=%d",
+                    recsysUrl, bookId, limit);
+
+            SimilarBooksResponse response = restTemplate.getForObject(
+                    url, SimilarBooksResponse.class);
+
+            if (response == null || response.getItems() == null) {
+                return Collections.emptyList();
+            }
+
+            // Map similar items to full book responses
+            return response.getItems().stream()
+                    .map(item -> {
+                        try {
+                            return bookService.getBookById(item.getBookId());
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(book -> book != null)
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
 }
