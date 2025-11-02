@@ -1,5 +1,8 @@
 package com.bookrecommend.book_recommend_be.service.recommendation;
 
+import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityBooksResponse;
+import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityItem;
+import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityResponse;
 import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationItem;
 import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationsResponse;
 import com.bookrecommend.book_recommend_be.dto.recommendation.SimilarBooksResponse;
@@ -12,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -80,6 +84,43 @@ public class RecommendationService {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    public DiversityBooksResponse getDiversityBooks(Long bookId, int limit) {
+        try {
+            String url = String.format("%s/diversity?book_id=%d&limit=%d",
+                    recsysUrl, bookId, limit);
+
+            DiversityResponse response = restTemplate.getForObject(
+                    url, DiversityResponse.class);
+
+            if (response == null) {
+                return new DiversityBooksResponse(Collections.emptyList());
+            }
+
+            List<BookResponse> books = mapDiversityItems(response.getItems());
+            return new DiversityBooksResponse(books);
+
+        } catch (Exception e) {
+            return new DiversityBooksResponse(Collections.emptyList());
+        }
+    }
+
+    private List<BookResponse> mapDiversityItems(List<DiversityItem> items) {
+        if (items == null || items.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return items.stream()
+                .map(item -> {
+                    try {
+                        return bookService.getBookById(item.getBookId());
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
 }

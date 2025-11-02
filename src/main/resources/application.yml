@@ -101,8 +101,9 @@ logging:
     #    org.hibernate.SQL: DEBUG
     org.springframework.security: DEBUG
     org.springframework.security.oauth2: DEBUG
-#    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-#    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
-#    com.zaxxer.hikari: INFO
-#    org.hibernate.orm.connections.pooling: WARN
+    org.springframework.boot.autoconfigure.condition: OFF
+    #    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    #    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
+    #    com.zaxxer.hikari: INFO
+    org.hibernate.orm.connections.pooling: WARN
 #    org.springframework.jdbc.datasource.DataSourceUtils: INFO

@@ -1,5 +1,6 @@
 package com.bookrecommend.book_recommend_be.controller;
 
+import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityBooksResponse;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.service.recommendation.RecommendationService;
@@ -44,6 +45,24 @@ public class RecommendationController {
         List<BookResponse> books = recommendationService.getSimilarBooks(bookId, limit);
         return ResponseEntity.ok(
                 ApiResponse.success(books, "Similar books retrieved successfully")
+        );
+    }
+
+    @GetMapping("/diversity-books")
+    public ResponseEntity<ApiResponse<DiversityBooksResponse>> getDiversityBooks(
+            @RequestParam Long bookId,
+            @RequestParam(defaultValue = "5") int limit) {
+
+        if (limit < 1 || limit > 100) {
+            DiversityBooksResponse empty = new DiversityBooksResponse(Collections.emptyList());
+            return ResponseEntity.ok(
+                    ApiResponse.success(empty, "Limit must be between 1 and 100")
+            );
+        }
+
+        DiversityBooksResponse books = recommendationService.getDiversityBooks(bookId, limit);
+        return ResponseEntity.ok(
+                ApiResponse.success(books, "Diversity recommendations retrieved successfully")
         );
     }
 
