@@ -3,13 +3,11 @@ package com.bookrecommend.book_recommend_be.service.recommendation;
 import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityBooksResponse;
 import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityItem;
 import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityResponse;
-import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationItem;
 import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationsResponse;
 import com.bookrecommend.book_recommend_be.dto.recommendation.SimilarBooksResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.service.book.IBookService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -24,12 +22,11 @@ public class RecommendationService {
 
     private final RestTemplate restTemplate;
     private final IBookService bookService;
-
-    @Value("${recsys.url}")
-    private String recsysUrl;
+    private final RecsysRoutingService recsysRoutingService;
 
     public List<BookResponse> getRecommendations(Long userId, int limit) {
         try {
+            String recsysUrl = recsysRoutingService.getActiveBaseUrl();
             String url = String.format("%s/recommendations?user_id=%d&limit=%d",
                     recsysUrl, userId, limit);
 
@@ -59,6 +56,7 @@ public class RecommendationService {
 
     public List<BookResponse> getSimilarBooks(Long bookId, int limit) {
         try {
+            String recsysUrl = recsysRoutingService.getActiveBaseUrl();
             String url = String.format("%s/similar?book_id=%d&limit=%d",
                     recsysUrl, bookId, limit);
 
@@ -88,6 +86,7 @@ public class RecommendationService {
 
     public DiversityBooksResponse getDiversityBooks(Long bookId, int limit) {
         try {
+            String recsysUrl = recsysRoutingService.getActiveBaseUrl();
             String url = String.format("%s/diversity?book_id=%d&limit=%d",
                     recsysUrl, bookId, limit);
 

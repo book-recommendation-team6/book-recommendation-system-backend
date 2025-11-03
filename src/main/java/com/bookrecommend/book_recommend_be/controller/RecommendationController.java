@@ -1,9 +1,11 @@
 package com.bookrecommend.book_recommend_be.controller;
 
 import com.bookrecommend.book_recommend_be.dto.recommendation.DiversityBooksResponse;
+import com.bookrecommend.book_recommend_be.dto.recommendation.RecommendationModelInfo;
 import com.bookrecommend.book_recommend_be.dto.response.ApiResponse;
 import com.bookrecommend.book_recommend_be.dto.response.BookResponse;
 import com.bookrecommend.book_recommend_be.service.recommendation.RecommendationService;
+import com.bookrecommend.book_recommend_be.service.recommendation.RecsysRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import java.util.List;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
+    private final RecsysRoutingService recsysRoutingService;
 
     @GetMapping("/recommendations")
     public ResponseEntity<ApiResponse<List<BookResponse>>> getRecommendations(
@@ -66,5 +69,12 @@ public class RecommendationController {
         );
     }
 
+    @GetMapping("/recommendation/active-model")
+    public ResponseEntity<ApiResponse<RecommendationModelInfo>> getActiveRecommendationModel() {
+        RecommendationModelInfo info = recsysRoutingService.getActiveModelInfo();
+        return ResponseEntity.ok(
+                ApiResponse.success(info, "Active recommendation model retrieved successfully")
+        );
+    }
 
 }
