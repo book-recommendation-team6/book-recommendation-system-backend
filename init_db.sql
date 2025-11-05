@@ -1,6 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS rc_book_db;
+CREATE SCHEMA IF NOT EXISTS book_recommendation_system;
 
-SET search_path TO rc_book_db;
+SET search_path TO book_recommendation_system;
 
 -- Drop old tables
 DROP TABLE IF EXISTS bookmarks CASCADE;
